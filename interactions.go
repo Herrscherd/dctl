@@ -336,21 +336,22 @@ func (in *Interactions) EditResponse(ctx context.Context, appID, token string, r
 // UpsertStatusMessage edits the existing status message or sends a new one,
 // returning the live message id.
 func (in *Interactions) UpsertStatusMessage(ctx context.Context, channelID, msgID, content string) (string, error) {
+	// Route through Messages so message path/body construction lives in one place;
+	// only the edit→send 404 fallback is specific to this call.
+	msgs := &Messages{rt: in.rt, def: in.def}
 	if msgID != "" {
-		err := in.rt.Do(ctx, http.MethodPatch, "/channels/"+seg(channelID)+"/messages/"+seg(msgID),
-			map[string]any{"content": content}, nil)
-		if err == nil {
+		if _, err := msgs.Edit(ctx, channelID, msgID, content); err == nil {
 			return msgID, nil
-		}
-		var apiErr *transport.APIError
-		if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
-			return "", err
+		} else {
+			var apiErr *transport.APIError
+			if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
+				return "", err
+			}
 		}
 	}
-	var msg Message
-	if err := in.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/messages",
-		map[string]any{"content": content}, &msg); err != nil {
+	sent, err := msgs.Send(ctx, channelID, content)
+	if err != nil {
 		return "", err
 	}
-	return msg.ID, nil
+	return sent.ID, nil
 }
