@@ -64,6 +64,29 @@ func TestHTTPDoSurfacesAPIError(t *testing.T) {
 	}
 }
 
+// A transport-layer failure (here: connection refused) must not echo the request
+// URL, whose path carries secret tokens (webhook/interaction tokens) into any log
+// the caller writes. net/http returns a *url.Error whose Error() embeds the full
+// URL; Do must scrub it.
+func TestHTTPDoTransportErrorDoesNotLeakToken(t *testing.T) {
+	const secret = "SUPERSECRETWEBHOOKTOKEN"
+	// 127.0.0.1:1 refuses connections, forcing client.Do to fail.
+	rt := NewHTTP("bottok", WithBase("http://127.0.0.1:1"))
+	err := rt.Do(context.Background(), http.MethodPost, "/webhooks/123/"+secret, nil, nil)
+	if err == nil {
+		t.Fatal("want transport error")
+	}
+	// The secret token (a path segment) must never survive into the error string.
+	// The destination host may remain (it is the public API base, not a secret).
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("error leaks token: %q", err.Error())
+	}
+	// Cause is preserved for errors.Is against context/network errors.
+	if !strings.Contains(err.Error(), "POST") {
+		t.Fatalf("error dropped method context: %q", err.Error())
+	}
+}
+
 func TestHTTPDoMarshalsBody(t *testing.T) {
 	var got map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

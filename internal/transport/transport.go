@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -64,6 +65,20 @@ func NewHTTP(token string, opts ...Option) *HTTP {
 // Enabled reports whether a token is configured.
 func (h *HTTP) Enabled() bool { return h != nil && h.token != "" }
 
+// scrubURLError strips the request URL from a transport error. net/http returns a
+// *url.Error whose Error() embeds the full URL, and several Discord paths carry
+// secret tokens (webhook/interaction tokens) as path segments — echoing that URL
+// into a caller's log would leak them. We keep only the method and the wrapped
+// cause (dial/timeout/context error), which is token-free and preserves errors.Is
+// against context.DeadlineExceeded / context.Canceled.
+func scrubURLError(method string, err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return fmt.Errorf("dctl: %s request failed: %w", method, ue.Err)
+	}
+	return err
+}
+
 func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error {
 	if !h.Enabled() {
 		return ErrDisabled
@@ -87,7 +102,7 @@ func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error
 	}
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return err
+		return scrubURLError(method, err)
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
