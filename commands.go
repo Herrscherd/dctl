@@ -197,10 +197,10 @@ func (o Option) Loc(l Locale, name, desc string) Option {
 }
 
 // Range sets min/max value (INTEGER or NUMBER options).
-func (o Option) Range(min, max float64) Option { o.minVal, o.maxVal = &min, &max; return o }
+func (o Option) Range(lo, hi float64) Option { o.minVal, o.maxVal = &lo, &hi; return o }
 
 // Len sets min/max length (STRING options).
-func (o Option) Len(min, max int) Option { o.minLen, o.maxLen = &min, &max; return o }
+func (o Option) Len(lo, hi int) Option { o.minLen, o.maxLen = &lo, &hi; return o }
 
 // Choices sets the fixed choice list (STRING/INTEGER/NUMBER options).
 func (o Option) Choices(cs ...Choice) Option { o.choices = cs; return o }
