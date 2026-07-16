@@ -163,7 +163,7 @@ func findFocused(opts []InteractionOption) (string, string, bool) {
 // Subcommand returns the name of the first sub-command option, if any.
 func (d InteractionData) Subcommand() (string, []InteractionOption) {
 	for _, o := range d.Options {
-		if o.Type == 1 { // SUB_COMMAND
+		if o.Type == optSubCommand {
 			return o.Name, o.Options
 		}
 	}
