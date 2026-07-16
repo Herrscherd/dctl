@@ -74,14 +74,14 @@ func (c *Components) Ack(ctx context.Context, id, token, content string) error {
 	return c.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback", body, nil)
 }
 
-// clamp truncates s to at most max runes without splitting a multibyte rune.
-func clamp(s string, max int) string {
-	if len(s) <= max {
+// clamp truncates s to at most limit runes without splitting a multibyte rune.
+func clamp(s string, limit int) string {
+	if len(s) <= limit {
 		return s
 	}
 	r := []rune(s)
-	if len(r) <= max {
+	if len(r) <= limit {
 		return s
 	}
-	return string(r[:max])
+	return string(r[:limit])
 }
