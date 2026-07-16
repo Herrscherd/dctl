@@ -3,7 +3,6 @@ package dctl
 import (
 	"context"
 	"net/http"
-	"net/url"
 
 	"github.com/Herrscherd/dctl/internal/transport"
 )
@@ -29,6 +28,6 @@ func (r *Reactions) do(ctx context.Context, method, channelID, messageID, emoji 
 	if err != nil {
 		return err
 	}
-	path := "/channels/" + seg(ch) + "/messages/" + seg(messageID) + "/reactions/" + url.PathEscape(emoji) + "/@me"
+	path := "/channels/" + seg(ch) + "/messages/" + seg(messageID) + "/reactions/" + seg(emoji) + "/@me"
 	return r.rt.Do(ctx, method, path, nil, nil)
 }
