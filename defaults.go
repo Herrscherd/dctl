@@ -19,8 +19,13 @@ type defaults struct {
 	channel string
 	guilds  *Guilds
 
-	mu       sync.Mutex
+	// appID and the sole-guild id are resolved independently via one network
+	// call each; separate locks keep a slow guild lookup from blocking an app-id
+	// lookup (and vice-versa). Each guards only its own value, held across the
+	// fetch so concurrent callers of the same value dedupe rather than stampede.
+	muApp    sync.Mutex
 	appID    string
+	muGuild  sync.Mutex
 	soleGuid string
 }
 
@@ -38,8 +43,8 @@ func (d *defaults) resolveGuild(ctx context.Context, guildID string) (string, er
 	if guildID != "" {
 		return guildID, nil
 	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.muGuild.Lock()
+	defer d.muGuild.Unlock()
 	if d.soleGuid != "" {
 		return d.soleGuid, nil
 	}
@@ -52,8 +57,8 @@ func (d *defaults) resolveGuild(ctx context.Context, guildID string) (string, er
 }
 
 func (d *defaults) appIDOnce(ctx context.Context) (string, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.muApp.Lock()
+	defer d.muApp.Unlock()
 	if d.appID != "" {
 		return d.appID, nil
 	}
