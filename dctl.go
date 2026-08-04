@@ -21,6 +21,7 @@ type ClientOption func(*clientConfig)
 type clientConfig struct {
 	httpClient *http.Client
 	guild      string
+	global     bool
 }
 
 // WithHTTPClient overrides the default 15s-timeout HTTP client.
@@ -34,6 +35,15 @@ func WithHTTPClient(h *http.Client) ClientOption {
 // lose command registration entirely.
 func WithGuild(id string) ClientOption {
 	return func(c *clientConfig) { c.guild = id }
+}
+
+// WithGlobalCommands registers slash commands on the application rather than on
+// one guild, so every server the bot is in gets them — the only scope that
+// works for a bot meant to be installed anywhere. Guild commands appear
+// instantly and global ones take up to an hour to propagate, which is why they
+// stay the default. Other guild-scoped ops are unaffected.
+func WithGlobalCommands() ClientOption {
+	return func(c *clientConfig) { c.global = true }
 }
 
 // New builds a Client. token is the bot token (kept in memory only). defaultChannel
@@ -50,6 +60,7 @@ func New(token, defaultChannel string, opts ...ClientOption) *Client {
 	rt := transport.NewHTTP(token, topts...)
 	c := newWith(rt, defaultChannel)
 	c.def.guild = cfg.guild
+	c.def.globalCommands = cfg.global
 	return c
 }
 

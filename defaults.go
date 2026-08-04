@@ -20,6 +20,10 @@ type defaults struct {
 	guild   string
 	guilds  *Guilds
 
+	// globalCommands scopes slash commands to the application instead of a
+	// guild; it deliberately touches nothing else that resolves a guild.
+	globalCommands bool
+
 	// appID and the sole-guild id are resolved independently via one network
 	// call each; separate locks keep a slow guild lookup from blocking an app-id
 	// lookup (and vice-versa). Each guards only its own value, held across the
