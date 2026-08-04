@@ -34,6 +34,22 @@ func TestFocusedNoneWhenAbsent(t *testing.T) {
 	}
 }
 
+// Discord puts the caller under `member.user` in a guild and under `user` in a
+// DM. A permission check that reads only one sees an empty id in the other.
+func TestInteractionUserIDCoversGuildAndDM(t *testing.T) {
+	guild := Interaction{Member: Member{User: Author{ID: "u1"}}}
+	if got := guild.UserID(); got != "u1" {
+		t.Fatalf("guild UserID() = %q, want u1", got)
+	}
+	dm := Interaction{User: Author{ID: "u2"}}
+	if got := dm.UserID(); got != "u2" {
+		t.Fatalf("dm UserID() = %q, want u2", got)
+	}
+	if got := (Interaction{}).UserID(); got != "" {
+		t.Fatalf("empty UserID() = %q, want empty", got)
+	}
+}
+
 func TestInteractionsRespondNoAllowedMentions(t *testing.T) {
 	s := transport.NewStub()
 	in := &Interactions{rt: s, def: &defaults{guilds: &Guilds{rt: s}}}
