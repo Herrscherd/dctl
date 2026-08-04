@@ -33,6 +33,45 @@ func TestThreadsStart(t *testing.T) {
 	}
 }
 
+// A private thread is created off the CHANNEL, never off a message: a message
+// would be the public trace the thread exists to avoid.
+func TestThreadsStartPrivate(t *testing.T) {
+	s := transport.NewStub().Reply(`{"id":"t9","name":"job","type":12}`)
+	ch, err := thr(s).StartPrivate(context.Background(), "c1", "job")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ch.ID != "t9" || ch.Type != ChannelPrivateThread {
+		t.Fatalf("thread = %+v", ch)
+	}
+	c := s.Last()
+	if c.Method != "POST" || c.Path != "/channels/c1/threads" {
+		t.Fatalf("call = %s %s", c.Method, c.Path)
+	}
+	body := c.Body.(map[string]any)
+	if body["type"] != ChannelPrivateThread {
+		t.Errorf("type = %v, want a private thread", body["type"])
+	}
+	// invitable would let any member drag others in, which defeats the point.
+	if body["invitable"] != false {
+		t.Errorf("invitable = %v, want false", body["invitable"])
+	}
+	if body["auto_archive_duration"] != autoArchive {
+		t.Errorf("auto_archive_duration = %v", body["auto_archive_duration"])
+	}
+}
+
+func TestThreadsAddMember(t *testing.T) {
+	s := transport.NewStub().Reply(``)
+	if err := thr(s).AddMember(context.Background(), "t9", "u1"); err != nil {
+		t.Fatal(err)
+	}
+	c := s.Last()
+	if c.Method != "PUT" || c.Path != "/channels/t9/thread-members/u1" {
+		t.Fatalf("call = %s %s", c.Method, c.Path)
+	}
+}
+
 func TestThreadsCreateForum(t *testing.T) {
 	s := transport.NewStub().
 		Reply(`[{"id":"g1"}]`).
