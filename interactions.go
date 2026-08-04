@@ -25,12 +25,24 @@ type Interaction struct {
 	GuildID   string          `json:"guild_id"`
 	ChannelID string          `json:"channel_id"`
 	Member    Member          `json:"member"`
+	User      Author          `json:"user"`
 	Data      InteractionData `json:"data"`
 }
 
 // Member carries the invoking user (interactions in a guild come via member.user).
 type Member struct {
 	User Author `json:"user"`
+}
+
+// UserID is who invoked the interaction, wherever Discord put them: a guild
+// interaction carries the caller under `member.user`, a DM under `user`. Reading
+// only one of the two makes every permission check in the other context see an
+// empty id.
+func (i Interaction) UserID() string {
+	if id := i.Member.User.ID; id != "" {
+		return id
+	}
+	return i.User.ID
 }
 
 // InteractionData is the invoked command + its options. For a component
