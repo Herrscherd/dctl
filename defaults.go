@@ -17,6 +17,7 @@ var ErrNoChannel = errors.New("dctl: no channel (DISCORD_CHANNEL_ID or --channel
 type defaults struct {
 	rt      transport.Doer
 	channel string
+	guild   string
 	guilds  *Guilds
 
 	// appID and the sole-guild id are resolved independently via one network
@@ -42,6 +43,11 @@ func (d *defaults) resolveChannel(channelID string) (string, error) {
 func (d *defaults) resolveGuild(ctx context.Context, guildID string) (string, error) {
 	if guildID != "" {
 		return guildID, nil
+	}
+	// A configured guild (WithGuild) settles it without a network call and
+	// without the mono-server assumption Sole makes.
+	if d.guild != "" {
+		return d.guild, nil
 	}
 	d.muGuild.Lock()
 	defer d.muGuild.Unlock()
