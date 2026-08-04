@@ -30,10 +30,13 @@ type Attachment struct {
 	Size        int    `json:"size"`
 }
 
-// EmbedMedia is an image carried by an embed. Only the URL is surfaced: it is
-// what a reader needs to fetch the picture.
+// EmbedMedia is an image carried by an embed. URL is where the picture actually
+// lives, which for a link preview is a third-party site; ProxyURL is Discord's
+// own copy of it and is present whenever Discord could fetch it. A reader that
+// only trusts Discord hosts wants ProxyURL, falling back to URL.
 type EmbedMedia struct {
-	URL string `json:"url"`
+	URL      string `json:"url"`
+	ProxyURL string `json:"proxy_url"`
 }
 
 // EmbedField is one name/value pair in an embed's body.
