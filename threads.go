@@ -24,6 +24,31 @@ func (t *Threads) Start(ctx context.Context, channelID, messageID, name string) 
 	return &ch, nil
 }
 
+// StartPrivate opens a private thread in channelID, with no parent message so
+// the channel shows no trace of it. Only invited members and moderators holding
+// MANAGE_THREADS can see it — invitable is false, so members cannot pull others
+// in. The creating bot is a member; add the humans with AddMember.
+func (t *Threads) StartPrivate(ctx context.Context, channelID, name string) (*Channel, error) {
+	var ch Channel
+	if err := t.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/threads",
+		map[string]any{
+			"name":                  name,
+			"type":                  ChannelPrivateThread,
+			"invitable":             false,
+			"auto_archive_duration": autoArchive,
+		}, &ch); err != nil {
+		return nil, err
+	}
+	return &ch, nil
+}
+
+// AddMember gives userID access to threadID. A private thread is invisible until
+// its members are added, so this is what makes one usable by a person.
+func (t *Threads) AddMember(ctx context.Context, threadID, userID string) error {
+	return t.rt.Do(ctx, http.MethodPut,
+		"/channels/"+seg(threadID)+"/thread-members/"+seg(userID), nil, nil)
+}
+
 // CreateForum creates a forum channel named name in guildID (or the sole guild).
 func (t *Threads) CreateForum(ctx context.Context, guildID, name string) (*Channel, error) {
 	gid, err := t.def.resolveGuild(ctx, guildID)

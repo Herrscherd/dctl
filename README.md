@@ -24,7 +24,7 @@ msgs, _ := c.Messages().Read(ctx, "", 20, "")           // oldest-first
 | `Guilds()` | `List` `Sole` |
 | `Members()` | `List` `Get` `Kick` `Ban` |
 | `Roles()` | `List` `Create` `Update` `Delete` `Assign` `Unassign` |
-| `Threads()` | `Start` `CreateForum` `ForumPost` |
+| `Threads()` | `Start` `StartPrivate` `AddMember` `CreateForum` `ForumPost` |
 | `Reactions()` | `Add` `Remove` |
 | `Permissions()` | `Set` `Remove` |
 | `Webhooks()` | `Create` `List` `Delete` `Execute` |
