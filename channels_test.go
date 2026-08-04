@@ -46,9 +46,10 @@ func TestChannelsRename(t *testing.T) {
 }
 
 func TestChannelsEnsureUnderReuses(t *testing.T) {
-	// Sole-guild resolution, then the channel listing holds a match under p1.
+	// The parent category names its own guild, then the channel listing holds a
+	// match under p1.
 	s := transport.NewStub().
-		Reply(`[{"id":"g1"}]`).
+		Reply(`{"id":"p1","guild_id":"g1"}`).
 		Reply(`[{"id":"c9","name":"Notes","type":0,"parent_id":"p1"}]`)
 	ch, err := chans(s).EnsureUnder(context.Background(), "p1", "notes")
 	if err != nil {
@@ -64,10 +65,10 @@ func TestChannelsEnsureUnderReuses(t *testing.T) {
 
 func TestChannelsEnsureUnderCreates(t *testing.T) {
 	// No match under p1 (the existing channel sits under a different parent), so
-	// it creates one nested under p1.
-	// The sole-guild id is resolved and cached once, so only one guild-list reply.
+	// it creates one nested under p1 — in the guild the parent already named, with
+	// no second lookup of it.
 	s := transport.NewStub().
-		Reply(`[{"id":"g1"}]`).
+		Reply(`{"id":"p1","guild_id":"g1"}`).
 		Reply(`[{"id":"c9","name":"notes","type":0,"parent_id":"other"}]`).
 		Reply(`{"id":"c10","name":"notes","type":0,"parent_id":"p1"}`)
 	ch, err := chans(s).EnsureUnder(context.Background(), "p1", "notes")
@@ -83,6 +84,28 @@ func TestChannelsEnsureUnderCreates(t *testing.T) {
 	}
 	if c.Body.(map[string]any)["parent_id"] != "p1" {
 		t.Errorf("body = %v", c.Body)
+	}
+	if n := len(s.Calls()); n != 3 {
+		t.Errorf("made %d calls, want 3 (parent, list, create)", n)
+	}
+}
+
+// A bot in several servers has no sole guild: nesting under a category must
+// resolve the server from that category, never from the bot's membership list.
+func TestChannelsUnderNeverAsksForTheSoleGuild(t *testing.T) {
+	s := transport.NewStub().
+		Reply(`{"id":"p1","guild_id":"g2"}`).
+		Reply(`{"id":"c1","name":"notes","type":0,"parent_id":"p1"}`)
+	if _, err := chans(s).CreateUnder(context.Background(), "p1", "notes"); err != nil {
+		t.Fatal(err)
+	}
+	if c := s.Last(); c.Path != "/guilds/g2/channels" {
+		t.Errorf("create call = %s, want the parent's guild", c.Path)
+	}
+	for _, c := range s.Calls() {
+		if c.Path == "/users/@me/guilds" {
+			t.Fatal("the parent category already names its guild; nothing should list the bot's servers")
+		}
 	}
 }
 
