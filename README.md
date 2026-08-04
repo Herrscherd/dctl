@@ -42,7 +42,10 @@ client.
 
 Slash commands: `NewCommand(...).With(dctl.String(...), dctl.Sub(...))` builds a
 typed command; `c.Interactions().Registry()` owns `Add`, `Sync` (diff against
-Discord: create/edit/delete), and `Dispatch` / `DispatchAutocomplete`.
+Discord: create/edit/delete), and `Dispatch` / `DispatchAutocomplete`. They are
+registered on the default guild — instant, one server — or on the application
+with `WithGlobalCommands`, which reaches every server the bot is in and takes up
+to an hour to propagate.
 
 Path segments are percent-escaped and queries built with `url.Values`.
 `Webhook.Token` and `Interaction.Token` are `Secret` — `[REDACTED]` in logs and
