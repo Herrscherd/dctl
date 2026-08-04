@@ -198,17 +198,23 @@ func fetchAppID(ctx context.Context, rt transport.Doer) (string, error) {
 	return u.ID, nil
 }
 
-// RegisteredCommand is the read form of a registered guild command.
+// RegisteredCommand is the read form of a registered command.
 type RegisteredCommand struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
+// commandsBase is the command collection every command op reads and writes:
+// the application's global commands when the client asked for them
+// (WithGlobalCommands), otherwise the default guild's.
 func (in *Interactions) commandsBase(ctx context.Context) (string, error) {
 	appID, err := in.AppID(ctx)
 	if err != nil {
 		return "", err
+	}
+	if in.def.globalCommands {
+		return "/applications/" + seg(appID) + "/commands", nil
 	}
 	gid, err := in.def.resolveGuild(ctx, "")
 	if err != nil {
@@ -217,7 +223,7 @@ func (in *Interactions) commandsBase(ctx context.Context) (string, error) {
 	return "/applications/" + seg(appID) + "/guilds/" + seg(gid) + "/commands", nil
 }
 
-// RegisterCommands bulk-overwrites the sole guild's commands from raw maps.
+// RegisterCommands bulk-overwrites the command scope from raw maps.
 func (in *Interactions) RegisterCommands(ctx context.Context, commands []map[string]any) error {
 	base, err := in.commandsBase(ctx)
 	if err != nil {
@@ -226,7 +232,7 @@ func (in *Interactions) RegisterCommands(ctx context.Context, commands []map[str
 	return in.rt.Do(ctx, http.MethodPut, base, commands, nil)
 }
 
-// Register bulk-overwrites the sole guild's commands from builders.
+// Register bulk-overwrites the command scope from builders.
 func (in *Interactions) Register(ctx context.Context, cmds ...*Command) error {
 	body := make([]map[string]any, 0, len(cmds))
 	for _, c := range cmds {
@@ -235,7 +241,7 @@ func (in *Interactions) Register(ctx context.Context, cmds ...*Command) error {
 	return in.RegisterCommands(ctx, body)
 }
 
-// List returns the sole guild's currently registered commands.
+// List returns the currently registered commands in the client's scope.
 func (in *Interactions) List(ctx context.Context) ([]RegisteredCommand, error) {
 	base, err := in.commandsBase(ctx)
 	if err != nil {
