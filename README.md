@@ -34,9 +34,11 @@ msgs, _ := c.Messages().Read(ctx, "", 20, "")           // oldest-first
 ## Notes
 
 Channel-scoped ops accept `""` for the configured default channel; guild-scoped
-ops accept `""` for the bot's sole guild. Nothing is read from the environment —
-pass the token explicitly. Without one, `Enabled()` is false and every call
-returns `ErrDisabled`. `WithHTTPClient` overrides the default 15s client.
+ops accept `""` for the bot's sole guild — or for the guild pinned by
+`WithGuild`, which a bot in several servers needs. Nothing is read from the
+environment — pass the token explicitly. Without one, `Enabled()` is false and
+every call returns `ErrDisabled`. `WithHTTPClient` overrides the default 15s
+client.
 
 Slash commands: `NewCommand(...).With(dctl.String(...), dctl.Sub(...))` builds a
 typed command; `c.Interactions().Registry()` owns `Add`, `Sync` (diff against

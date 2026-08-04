@@ -20,11 +20,20 @@ type ClientOption func(*clientConfig)
 
 type clientConfig struct {
 	httpClient *http.Client
+	guild      string
 }
 
 // WithHTTPClient overrides the default 15s-timeout HTTP client.
 func WithHTTPClient(h *http.Client) ClientOption {
 	return func(c *clientConfig) { c.httpClient = h }
+}
+
+// WithGuild pins the guild that guild-scoped ops target when no explicit id is
+// passed. Without it they fall back to Guilds().Sole, which errors when the bot
+// is in more than one server — a bot invited to a second guild would otherwise
+// lose command registration entirely.
+func WithGuild(id string) ClientOption {
+	return func(c *clientConfig) { c.guild = id }
 }
 
 // New builds a Client. token is the bot token (kept in memory only). defaultChannel
@@ -39,7 +48,9 @@ func New(token, defaultChannel string, opts ...ClientOption) *Client {
 		topts = append(topts, transport.WithHTTPClient(cfg.httpClient))
 	}
 	rt := transport.NewHTTP(token, topts...)
-	return newWith(rt, defaultChannel)
+	c := newWith(rt, defaultChannel)
+	c.def.guild = cfg.guild
+	return c
 }
 
 // newWith wires a Client around an arbitrary Doer (used by tests with a stub).
