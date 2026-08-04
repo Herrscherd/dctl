@@ -48,6 +48,10 @@ registered on the default guild — instant, one server — or on the applicatio
 with `WithGlobalCommands`, which reaches every server the bot is in and takes up
 to an hour to propagate.
 
+`Interaction.UserID()` is who invoked it, from `member.user` in a guild and from
+`user` in a DM — read either field alone and permission checks see an empty id in
+the other context.
+
 Path segments are percent-escaped and queries built with `url.Values`.
 `Webhook.Token` and `Interaction.Token` are `Secret` — `[REDACTED]` in logs and
 JSON, `.Reveal()` to read.
