@@ -30,6 +30,30 @@ type Attachment struct {
 	Size        int    `json:"size"`
 }
 
+// EmbedMedia is an image carried by an embed. Only the URL is surfaced: it is
+// what a reader needs to fetch the picture.
+type EmbedMedia struct {
+	URL string `json:"url"`
+}
+
+// EmbedField is one name/value pair in an embed's body.
+type EmbedField struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// Embed is the rich block a bot or a link preview attaches to a message. Most of
+// a webhook-driven channel's content lives here rather than in Content, so a
+// reader that only looks at Content sees an empty message.
+type Embed struct {
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
+	URL         string       `json:"url"`
+	Image       *EmbedMedia  `json:"image"`
+	Thumbnail   *EmbedMedia  `json:"thumbnail"`
+	Fields      []EmbedField `json:"fields"`
+}
+
 // Message is the subset of a Discord message we surface.
 type Message struct {
 	ID          string       `json:"id"`
@@ -38,6 +62,7 @@ type Message struct {
 	Author      Author       `json:"author"`
 	Timestamp   string       `json:"timestamp"`
 	Attachments []Attachment `json:"attachments"`
+	Embeds      []Embed      `json:"embeds"`
 }
 
 // Guild is a Discord server the bot belongs to.

@@ -69,6 +69,21 @@ func (m *Messages) Read(ctx context.Context, channelID string, limit int, after 
 	return msgs, nil
 }
 
+// Get returns one message by id from channelID (or the default channel). Read
+// only reaches the tail of a channel, so this is the way to a message named by
+// something other than recency — the one a reply points at, for instance.
+func (m *Messages) Get(ctx context.Context, channelID, messageID string) (*Message, error) {
+	ch, err := m.def.resolveChannel(channelID)
+	if err != nil {
+		return nil, err
+	}
+	var msg Message
+	if err := m.rt.Do(ctx, http.MethodGet, "/channels/"+seg(ch)+"/messages/"+seg(messageID), nil, &msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
 func (m *Messages) Edit(ctx context.Context, channelID, messageID, content string) (*Message, error) {
 	ch, err := m.def.resolveChannel(channelID)
 	if err != nil {

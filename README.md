@@ -19,7 +19,7 @@ msgs, _ := c.Messages().Read(ctx, "", 20, "")           // oldest-first
 
 | Accessor | Operations |
 |----------|------------|
-| `Messages()` | `Send` `Reply` `Read` `Edit` `Delete` `LastMessageAt` |
+| `Messages()` | `Send` `Reply` `Read` `Get` `Edit` `Delete` `LastMessageAt` |
 | `Channels()` | `List` `Get` `Type` `Create` `CreateUnder` `Rename` `Update` `Delete` `Ensure` `EnsureUnder` `Archive` |
 | `Guilds()` | `List` `Sole` |
 | `Members()` | `List` `Get` `Kick` `Ban` |
