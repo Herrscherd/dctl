@@ -81,7 +81,7 @@ func TestMessagesGetUsesTheDefaultChannel(t *testing.T) {
 func TestMessageDecodesEmbeds(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"m1","content":"","embeds":[{
 		"title":"Quest failed","description":"stack trace here","url":"https://example.test/run/1",
-		"image":{"url":"https://cdn.example.test/shot.png"},
+		"image":{"url":"https://cdn.example.test/shot.png","proxy_url":"https://media.discordapp.net/external/shot.png"},
 		"thumbnail":{"url":"https://cdn.example.test/thumb.png"},
 		"fields":[{"name":"env","value":"prod"}]}]}`)
 	got, err := msgs(s, "def").Get(context.Background(), "c", "m1")
@@ -97,6 +97,9 @@ func TestMessageDecodesEmbeds(t *testing.T) {
 	}
 	if e.Image == nil || e.Image.URL != "https://cdn.example.test/shot.png" {
 		t.Errorf("image = %+v", e.Image)
+	}
+	if e.Image.ProxyURL != "https://media.discordapp.net/external/shot.png" {
+		t.Errorf("proxy url = %q", e.Image.ProxyURL)
 	}
 	if e.Thumbnail == nil || e.Thumbnail.URL != "https://cdn.example.test/thumb.png" {
 		t.Errorf("thumbnail = %+v", e.Thumbnail)
