@@ -79,41 +79,95 @@ func scrubURLError(method string, err error) error {
 	return err
 }
 
+// rateLimitRetries is how many times a request waits out a 429 before giving
+// up. Discord's buckets are small — five writes per four seconds on some routes
+// — so a caller doing a handful of calls in a row will hit one in the ordinary
+// course of doing its job, and the answer says exactly how long to wait. Without
+// this, the caller sees a failure it can only paper over by retrying the whole
+// operation, which walks into the same wall.
+const rateLimitRetries = 4
+
+// maxRateLimitWait caps how long one request will sit waiting. Past it, the
+// answer is not a bucket refilling in a moment but a daily quota or something
+// the operator has to look at, and blocking on it would hide that.
+const maxRateLimitWait = 30 * time.Second
+
 func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error {
 	if !h.Enabled() {
 		return ErrDisabled
 	}
-	var rdr io.Reader
+	var buf []byte
 	if body != nil {
-		buf, err := json.Marshal(body)
+		var err error
+		if buf, err = json.Marshal(body); err != nil {
+			return err
+		}
+	}
+	for attempt := 0; ; attempt++ {
+		respBody, status, err := h.attempt(ctx, method, path, buf, body != nil)
 		if err != nil {
 			return err
 		}
+		if status == http.StatusTooManyRequests && attempt < rateLimitRetries {
+			wait, ok := retryAfter(respBody)
+			if ok && wait <= maxRateLimitWait {
+				select {
+				case <-time.After(wait):
+					continue
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		}
+		if status < 200 || status >= 300 {
+			return &APIError{Status: status, Body: strings.TrimSpace(string(respBody))}
+		}
+		if out == nil || len(respBody) == 0 {
+			return nil
+		}
+		return json.Unmarshal(respBody, out)
+	}
+}
+
+// retryAfter reads how long Discord asked us to wait. A 429 body carries it in
+// seconds, fractional. An unreadable body reports false rather than guessing: a
+// wait invented here would either hammer the route or stall the caller.
+func retryAfter(body []byte) (time.Duration, bool) {
+	var v struct {
+		RetryAfter float64 `json:"retry_after"`
+	}
+	if err := json.Unmarshal(body, &v); err != nil || v.RetryAfter <= 0 {
+		return 0, false
+	}
+	// Discord's clock and ours disagree by a little, and coming back a hair early
+	// spends the retry for nothing.
+	return time.Duration(v.RetryAfter*float64(time.Second)) + 250*time.Millisecond, true
+}
+
+// attempt performs one request and hands back the raw response. It separates
+// what is worth retrying (a status) from what is not (a transport failure).
+func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, hasBody bool) ([]byte, int, error) {
+	var rdr io.Reader
+	if hasBody {
 		rdr = bytes.NewReader(buf)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, h.base+path, rdr)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 	req.Header.Set("Authorization", "Bot "+h.token)
 	req.Header.Set("User-Agent", "dctl (https://github.com/Herrscherd/dctl, 1.0)")
-	if body != nil {
+	if hasBody {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return scrubURLError(method, err)
+		return nil, 0, scrubURLError(method, err)
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return fmt.Errorf("reading response: %w", err)
+		return nil, 0, fmt.Errorf("reading response: %w", err)
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &APIError{Status: resp.StatusCode, Body: strings.TrimSpace(string(respBody))}
-	}
-	if out == nil || len(respBody) == 0 {
-		return nil
-	}
-	return json.Unmarshal(respBody, out)
+	return respBody, resp.StatusCode, nil
 }
