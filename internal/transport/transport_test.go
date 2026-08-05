@@ -3,6 +3,8 @@ package transport
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -100,5 +102,112 @@ func TestHTTPDoMarshalsBody(t *testing.T) {
 	}
 	if got["content"] != "hi" {
 		t.Errorf("body content = %v", got["content"])
+	}
+}
+
+// Discord's buckets are small — five writes per four seconds on some routes — so
+// a caller doing a handful of calls in a row hits one while doing its job. The
+// answer says how long to wait, and waiting it out is the whole fix.
+func TestHTTPDoWaitsOutARateLimit(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"message":"You are being rate limited.","retry_after":0.01}`))
+			return
+		}
+		w.Write([]byte(`{"id":"42"}`))
+	}))
+	defer srv.Close()
+
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := NewHTTP("tok", WithBase(srv.URL)).Do(context.Background(), http.MethodGet, "/x", nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 || out.ID != "42" {
+		t.Fatalf("calls = %d, id = %q, want the request replayed after the wait", calls, out.ID)
+	}
+}
+
+// A body is consumable, so replaying a write means rebuilding it. Sending the
+// second attempt with an empty body would be worse than not retrying at all.
+func TestARetriedWriteCarriesItsBodyAgain(t *testing.T) {
+	var bodies []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		if len(bodies) == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"retry_after":0.01}`))
+			return
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	if err := NewHTTP("tok", WithBase(srv.URL)).Do(context.Background(), http.MethodPost, "/x",
+		map[string]string{"name": "mode"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies) != 2 || bodies[0] != bodies[1] {
+		t.Fatalf("bodies = %q, want the same body sent twice", bodies)
+	}
+}
+
+// Past a point the answer is not a bucket refilling in a moment but a quota, and
+// blocking on it would hide that from the caller.
+func TestALongRateLimitIsReportedRatherThanWaitedOut(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"retry_after":3600}`))
+	}))
+	defer srv.Close()
+
+	err := NewHTTP("tok", WithBase(srv.URL)).Do(context.Background(), http.MethodGet, "/x", nil, nil)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusTooManyRequests {
+		t.Fatalf("err = %v, want the 429 reported", err)
+	}
+	if calls != 1 {
+		t.Fatalf("calls = %d, want no waiting on an hour-long limit", calls)
+	}
+}
+
+// A route that stays limited must not retry forever: the caller is waiting on a
+// call that is never going to land.
+func TestARateLimitThatNeverClearsGivesUp(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"retry_after":0.001}`))
+	}))
+	defer srv.Close()
+
+	if err := NewHTTP("tok", WithBase(srv.URL)).Do(context.Background(), http.MethodGet, "/x", nil, nil); err == nil {
+		t.Fatal("a limit that never clears must be reported")
+	}
+	if calls != rateLimitRetries+1 {
+		t.Fatalf("calls = %d, want %d", calls, rateLimitRetries+1)
+	}
+}
+
+// A cancelled context must not be held by a request sitting out a wait.
+func TestAWaitingRequestStopsWithItsContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cancel()
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"retry_after":20}`))
+	}))
+	defer srv.Close()
+
+	if err := NewHTTP("tok", WithBase(srv.URL)).Do(ctx, http.MethodGet, "/x", nil, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want the cancellation", err)
 	}
 }
