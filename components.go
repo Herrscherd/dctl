@@ -66,8 +66,6 @@ func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, con
 // Ack acknowledges a component interaction with an UPDATE_MESSAGE (type 7):
 // rewrites the message content and drops the menu so the click is confirmed
 // and the dropdown can't be used twice. Must be sent within Discord's 3s deadline.
-//
-// It fails when Discord rejects the request.
 func (c *Components) Ack(ctx context.Context, interactionID, token, content string) error {
 	body := map[string]any{
 		fieldType: callbackUpdateMessage,

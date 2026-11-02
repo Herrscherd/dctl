@@ -15,14 +15,14 @@ type Reactions struct {
 
 // Add reacts to messageID with emoji (unicode or "name:id" for custom).
 //
-// It returns [ErrNoChannel] when channelID is empty and no default channel is set. It fails when Discord rejects the request.
+// It returns [ErrNoChannel] when channelID is empty and no default channel is set.
 func (r *Reactions) Add(ctx context.Context, channelID, messageID, emoji string) error {
 	return r.do(ctx, http.MethodPut, channelID, messageID, emoji)
 }
 
 // Remove removes the bot's own reaction.
 //
-// It returns [ErrNoChannel] when channelID is empty and no default channel is set. It fails when Discord rejects the request.
+// It returns [ErrNoChannel] when channelID is empty and no default channel is set.
 func (r *Reactions) Remove(ctx context.Context, channelID, messageID, emoji string) error {
 	return r.do(ctx, http.MethodDelete, channelID, messageID, emoji)
 }
