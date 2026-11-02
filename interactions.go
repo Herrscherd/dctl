@@ -100,24 +100,25 @@ func findOpt(opts []InteractionOption, name string) (string, bool) {
 
 // OptBool returns the bool value of a (possibly nested) option, false if absent.
 func (d InteractionData) OptBool(name string) bool {
-	if b, ok := findBool(d.Options, name); ok {
+	if b, ok := findTyped[bool](d.Options, name); ok {
 		return b
 	}
 	return false
 }
 
-func findBool(opts []InteractionOption, name string) (bool, bool) {
+func findTyped[T any](opts []InteractionOption, name string) (T, bool) {
 	for _, o := range opts {
 		if o.Name == name {
-			if b, ok := o.Value.(bool); ok {
-				return b, true
+			if v, ok := o.Value.(T); ok {
+				return v, true
 			}
 		}
-		if b, ok := findBool(o.Options, name); ok {
-			return b, true
+		if v, ok := findTyped[T](o.Options, name); ok {
+			return v, true
 		}
 	}
-	return false, false
+	var zero T
+	return zero, false
 }
 
 // OptInt returns the integer value of a (possibly nested) option by name. Discord
@@ -156,22 +157,29 @@ func findValue(opts []InteractionOption, name string) (any, bool) {
 // Focused returns the name and current (partial) string value of the option the
 // user is typing in an autocomplete interaction, searching nested subcommands.
 func (d InteractionData) Focused() (string, string, bool) {
-	return findFocused(d.Options)
+	focus, ok := findFocused(d.Options)
+	return focus.name, focus.text, ok
 }
 
-func findFocused(opts []InteractionOption) (string, string, bool) {
+type focusedOption struct {
+	name string
+	text string
+}
+
+func findFocused(opts []InteractionOption) (focusedOption, bool) {
 	for _, o := range opts {
 		if o.Focused {
-			if text, isText := o.Value.(string); isText {
-				return o.Name, text, true
+			text, isText := o.Value.(string)
+			if !isText {
+				text = ""
 			}
-			return o.Name, "", true
+			return focusedOption{name: o.Name, text: text}, true
 		}
-		if n, v, ok := findFocused(o.Options); ok {
-			return n, v, ok
+		if focus, ok := findFocused(o.Options); ok {
+			return focus, true
 		}
 	}
-	return "", "", false
+	return focusedOption{}, false
 }
 
 // Subcommand returns the name of the first sub-command option, if any.

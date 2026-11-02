@@ -91,13 +91,13 @@ func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error
 		return err
 	}
 	for attempt := 0; ; attempt++ {
-		respBody, status, err := h.attempt(ctx, method, path, buf, body != nil)
+		resp, err := h.attempt(ctx, method, path, buf, body != nil)
 		if err != nil {
 			return err
 		}
-		wait, retry := retryDelay(status, attempt, respBody)
+		wait, retry := retryDelay(resp.status, attempt, resp.body)
 		if !retry {
-			return decodeResponse(status, respBody, out)
+			return decodeResponse(resp.status, resp.body, out)
 		}
 		if err := waitFor(ctx, wait); err != nil {
 			return err
@@ -149,14 +149,19 @@ func retryAfter(body []byte) (time.Duration, bool) {
 	return time.Duration(v.RetryAfter*float64(time.Second)) + 250*time.Millisecond, true
 }
 
-func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, hasBody bool) ([]byte, int, error) {
+type response struct {
+	body   []byte
+	status int
+}
+
+func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, hasBody bool) (response, error) {
 	var rdr io.Reader
 	if hasBody {
 		rdr = bytes.NewReader(buf)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, h.base+path, rdr)
 	if err != nil {
-		return nil, 0, err
+		return response{}, err
 	}
 	req.Header.Set("Authorization", "Bot "+h.token)
 	req.Header.Set("User-Agent", "dctl (https://github.com/Herrscherd/dctl, 1.0)")
@@ -165,12 +170,12 @@ func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, has
 	}
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return nil, 0, scrubURLError(method, err)
+		return response{}, scrubURLError(method, err)
 	}
 	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	closeErr := resp.Body.Close()
 	if err := errors.Join(readErr, closeErr); err != nil {
-		return nil, 0, fmt.Errorf("reading response: %w", err)
+		return response{}, fmt.Errorf("reading response: %w", err)
 	}
-	return respBody, resp.StatusCode, nil
+	return response{body: respBody, status: resp.StatusCode}, nil
 }

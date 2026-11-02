@@ -256,8 +256,8 @@ func (o Option) build() map[string]any {
 
 func buildOptions(opts []Option) []map[string]any {
 	out := make([]map[string]any, 0, len(opts))
-	for _, o := range opts {
-		out = append(out, o.build())
+	for index := range opts {
+		out = append(out, opts[index].build())
 	}
 	return out
 }
