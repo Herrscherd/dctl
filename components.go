@@ -42,6 +42,8 @@ func choiceMenuComponents(customID string, options []SelectOption) []map[string]
 
 // SendSelectMenu posts content with a single-select dropdown. When replyTo is
 // set the message threads under it; customID routes the click back to the caller.
+//
+// It returns [ErrNoChannel] when channelID is empty and no default channel is set.
 func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, content, customID string, options []SelectOption) (*Message, error) {
 	ch, err := c.def.resolveChannel(channelID)
 	if err != nil {
@@ -64,6 +66,8 @@ func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, con
 // Ack acknowledges a component interaction with an UPDATE_MESSAGE (type 7):
 // rewrites the message content and drops the menu so the click is confirmed
 // and the dropdown can't be used twice. Must be sent within Discord's 3s deadline.
+//
+// It fails when Discord rejects the request.
 func (c *Components) Ack(ctx context.Context, id, token, content string) error {
 	body := map[string]any{
 		fieldType: callbackUpdateMessage,

@@ -44,6 +44,8 @@ func (t *Threads) StartPrivate(ctx context.Context, channelID, name string) (*Ch
 
 // AddMember gives userID access to threadID. A private thread is invisible until
 // its members are added, so this is what makes one usable by a person.
+//
+// It fails when Discord rejects the request.
 func (t *Threads) AddMember(ctx context.Context, threadID, userID string) error {
 	return t.rt.Do(ctx, http.MethodPut,
 		"/channels/"+seg(threadID)+"/thread-members/"+seg(userID), nil, nil)

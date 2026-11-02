@@ -25,6 +25,8 @@ type Channels struct {
 }
 
 // List returns the channels of a guild (or the sole guild when guildID is empty).
+//
+// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen.
 func (c *Channels) List(ctx context.Context, guildID string) ([]Channel, error) {
 	gid, err := c.def.resolveGuild(ctx, guildID)
 	if err != nil {
@@ -152,6 +154,8 @@ func (c *Channels) EnsureUnder(ctx context.Context, parentID, name string) (*Cha
 
 // Archive archives a thread/forum-post, or deletes a plain text channel
 // (text channels don't support PATCH {archived:true}).
+//
+// It fails when the channel type cannot be read, or when Discord rejects the request.
 func (c *Channels) Archive(ctx context.Context, channelID string) error {
 	ct, err := c.Type(ctx, channelID)
 	if err != nil {

@@ -21,12 +21,16 @@ const (
 // Set creates/updates a permission overwrite on channelID for overwriteID
 // (a role or member id). allow/deny are Discord permission bit-strings;
 // kind is OverwriteRole or OverwriteMember.
+//
+// It fails when Discord rejects the request.
 func (p *Permissions) Set(ctx context.Context, channelID, overwriteID string, kind int, allow, deny string) error {
 	return p.rt.Do(ctx, http.MethodPut, "/channels/"+seg(channelID)+"/permissions/"+seg(overwriteID),
 		map[string]any{fieldType: kind, "allow": allow, "deny": deny}, nil)
 }
 
 // Remove deletes the permission overwrite of a role or member in a channel.
+//
+// It fails when Discord rejects the request.
 func (p *Permissions) Remove(ctx context.Context, channelID, overwriteID string) error {
 	return p.rt.Do(ctx, http.MethodDelete, "/channels/"+seg(channelID)+"/permissions/"+seg(overwriteID), nil, nil)
 }
