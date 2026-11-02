@@ -11,27 +11,18 @@ import (
 // ErrNoChannel is returned when neither an explicit channel nor a default is set.
 var ErrNoChannel = errors.New("dctl: no channel (DISCORD_CHANNEL_ID or --channel)")
 
-// defaults resolves and caches the default channel/guild/app-id shared across
-// sub-clients. The bot's application id and sole-guild id are immutable for the
-// client's lifetime, so they are fetched once and memoized.
 type defaults struct {
 	rt      transport.Doer
 	channel string
 	guild   string
 	guilds  *Guilds
 
-	// globalCommands scopes slash commands to the application instead of a
-	// guild; it deliberately touches nothing else that resolves a guild.
 	globalCommands bool
 
-	// appID and the sole-guild id are resolved independently via one network
-	// call each; separate locks keep a slow guild lookup from blocking an app-id
-	// lookup (and vice-versa). Each guards only its own value, held across the
-	// fetch so concurrent callers of the same value dedupe rather than stampede.
 	muApp    sync.Mutex
 	appID    string
 	muGuild  sync.Mutex
-	soleGuid string
+	soleGUID string
 }
 
 func (d *defaults) resolveChannel(channelID string) (string, error) {
@@ -48,22 +39,20 @@ func (d *defaults) resolveGuild(ctx context.Context, guildID string) (string, er
 	if guildID != "" {
 		return guildID, nil
 	}
-	// A configured guild (WithGuild) settles it without a network call and
-	// without the mono-server assumption Sole makes.
 	if d.guild != "" {
 		return d.guild, nil
 	}
 	d.muGuild.Lock()
 	defer d.muGuild.Unlock()
-	if d.soleGuid != "" {
-		return d.soleGuid, nil
+	if d.soleGUID != "" {
+		return d.soleGUID, nil
 	}
-	g, err := d.guilds.Sole(ctx)
+	guild, err := d.guilds.Sole(ctx)
 	if err != nil {
 		return "", err
 	}
-	d.soleGuid = g.ID
-	return d.soleGuid, nil
+	d.soleGUID = guild.ID
+	return d.soleGUID, nil
 }
 
 func (d *defaults) appIDOnce(ctx context.Context) (string, error) {
@@ -72,10 +61,10 @@ func (d *defaults) appIDOnce(ctx context.Context) (string, error) {
 	if d.appID != "" {
 		return d.appID, nil
 	}
-	id, err := fetchAppID(ctx, d.rt)
+	appID, err := fetchAppID(ctx, d.rt)
 	if err != nil {
 		return "", err
 	}
-	d.appID = id
-	return id, nil
+	d.appID = appID
+	return appID, nil
 }

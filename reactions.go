@@ -14,20 +14,24 @@ type Reactions struct {
 }
 
 // Add reacts to messageID with emoji (unicode or "name:id" for custom).
+//
+// It returns [ErrNoChannel] when channelID is empty and no default channel is set.
 func (r *Reactions) Add(ctx context.Context, channelID, messageID, emoji string) error {
 	return r.do(ctx, http.MethodPut, channelID, messageID, emoji)
 }
 
 // Remove removes the bot's own reaction.
+//
+// It returns [ErrNoChannel] when channelID is empty and no default channel is set.
 func (r *Reactions) Remove(ctx context.Context, channelID, messageID, emoji string) error {
 	return r.do(ctx, http.MethodDelete, channelID, messageID, emoji)
 }
 
 func (r *Reactions) do(ctx context.Context, method, channelID, messageID, emoji string) error {
-	ch, err := r.def.resolveChannel(channelID)
+	channel, err := r.def.resolveChannel(channelID)
 	if err != nil {
 		return err
 	}
-	path := "/channels/" + seg(ch) + "/messages/" + seg(messageID) + "/reactions/" + seg(emoji) + "/@me"
+	path := "/channels/" + seg(channel) + "/messages/" + seg(messageID) + "/reactions/" + seg(emoji) + "/@me"
 	return r.rt.Do(ctx, method, path, nil, nil)
 }

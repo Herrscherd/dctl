@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -34,7 +35,7 @@ func TestNewWithTransportInjectsStub(t *testing.T) {
 func TestDisabledClientErrors(t *testing.T) {
 	c := New("", "")
 	_, err := c.Messages().Send(context.Background(), "x", "hi")
-	if err != transport.ErrDisabled {
+	if !errors.Is(err, transport.ErrDisabled) {
 		t.Errorf("err = %v, want ErrDisabled", err)
 	}
 }

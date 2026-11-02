@@ -21,21 +21,19 @@ type Components struct {
 	def *defaults
 }
 
-// choiceMenuComponents builds the Discord component tree for a single-select
-// dropdown: one ACTION_ROW (type 1) wrapping one STRING_SELECT (type 3).
 func choiceMenuComponents(customID string, options []SelectOption) []map[string]any {
 	opts := make([]map[string]any, 0, len(options))
-	for _, o := range options {
-		m := map[string]any{"label": clamp(o.Label, 100), "value": clamp(o.Value, 100)}
-		if o.Description != "" {
-			m["description"] = clamp(o.Description, 100)
+	for _, option := range options {
+		fields := map[string]any{"label": clamp(option.Label), fieldValue: clamp(option.Value)}
+		if option.Description != "" {
+			fields["description"] = clamp(option.Description)
 		}
-		opts = append(opts, m)
+		opts = append(opts, fields)
 	}
 	return []map[string]any{{
-		"type": 1,
-		"components": []map[string]any{{
-			"type":      3,
+		fieldType: 1,
+		fieldComponents: []map[string]any{{
+			fieldType:   componentStringSelect,
 			"custom_id": customID,
 			"options":   opts,
 		}},
@@ -44,20 +42,22 @@ func choiceMenuComponents(customID string, options []SelectOption) []map[string]
 
 // SendSelectMenu posts content with a single-select dropdown. When replyTo is
 // set the message threads under it; customID routes the click back to the caller.
+//
+// It returns [ErrNoChannel] when channelID is empty and no default channel is set.
 func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, content, customID string, options []SelectOption) (*Message, error) {
-	ch, err := c.def.resolveChannel(channelID)
+	channel, err := c.def.resolveChannel(channelID)
 	if err != nil {
 		return nil, err
 	}
 	body := map[string]any{
-		"content":    content,
-		"components": choiceMenuComponents(customID, options),
+		fieldContent:    content,
+		fieldComponents: choiceMenuComponents(customID, options),
 	}
 	if replyTo != "" {
 		body["message_reference"] = map[string]any{"message_id": replyTo, "fail_if_not_exists": false}
 	}
 	var msg Message
-	if err := c.rt.Do(ctx, http.MethodPost, "/channels/"+seg(ch)+"/messages", body, &msg); err != nil {
+	if err := c.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channel)+"/messages", body, &msg); err != nil {
 		return nil, err
 	}
 	return &msg, nil
@@ -66,22 +66,22 @@ func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, con
 // Ack acknowledges a component interaction with an UPDATE_MESSAGE (type 7):
 // rewrites the message content and drops the menu so the click is confirmed
 // and the dropdown can't be used twice. Must be sent within Discord's 3s deadline.
-func (c *Components) Ack(ctx context.Context, id, token, content string) error {
+func (c *Components) Ack(ctx context.Context, interactionID, token, content string) error {
 	body := map[string]any{
-		"type": 7,
-		"data": map[string]any{"content": content, "components": []any{}},
+		fieldType: callbackUpdateMessage,
+		fieldData: map[string]any{fieldContent: content, fieldComponents: []any{}},
 	}
-	return c.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback", body, nil)
+	return c.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(interactionID)+"/"+seg(token)+"/callback", body, nil)
 }
 
-// clamp truncates s to at most limit runes without splitting a multibyte rune.
-func clamp(s string, limit int) string {
-	if len(s) <= limit {
-		return s
+func clamp(text string) string {
+	limit := maxOptionText
+	if len(text) <= limit {
+		return text
 	}
-	r := []rune(s)
-	if len(r) <= limit {
-		return s
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
 	}
-	return string(r[:limit])
+	return string(runes[:limit])
 }

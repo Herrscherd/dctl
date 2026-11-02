@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -25,13 +26,11 @@ func TestDefaultsResolveChannelFallsBackToDefault(t *testing.T) {
 
 func TestDefaultsResolveChannelErrorsWhenNone(t *testing.T) {
 	d := &defaults{}
-	if _, err := d.resolveChannel(""); err != ErrNoChannel {
+	if _, err := d.resolveChannel(""); !errors.Is(err, ErrNoChannel) {
 		t.Fatalf("err = %v, want ErrNoChannel", err)
 	}
 }
 
-// A configured guild must win over the sole-guild lookup: a bot in several
-// servers has no sole guild, and the lookup would fail the call outright.
 func TestResolveGuildPrefersConfiguredGuild(t *testing.T) {
 	s := transport.NewStub().Reply(`[{"id":"g1","name":"a"},{"id":"g2","name":"b"}]`)
 	d := &defaults{guild: "g2", guilds: &Guilds{rt: s}}

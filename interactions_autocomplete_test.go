@@ -34,8 +34,6 @@ func TestFocusedNoneWhenAbsent(t *testing.T) {
 	}
 }
 
-// Discord puts the caller under `member.user` in a guild and under `user` in a
-// DM. A permission check that reads only one sees an empty id in the other.
 func TestInteractionUserIDCoversGuildAndDM(t *testing.T) {
 	guild := Interaction{Member: Member{User: Author{ID: "u1"}}}
 	if got := guild.UserID(); got != "u1" {
@@ -61,7 +59,7 @@ func TestInteractionsRespondNoAllowedMentions(t *testing.T) {
 	if c.Path != "/interactions/id/tok/callback" {
 		t.Errorf("path = %s", c.Path)
 	}
-	data := c.Body.(map[string]any)["data"].(map[string]any)
+	data := asType[map[string]any](t, asType[map[string]any](t, c.Body)["data"])
 	if _, present := data["allowed_mentions"]; present {
 		t.Error("allowed_mentions must NOT be injected")
 	}
@@ -77,8 +75,8 @@ func TestInteractionsAutocompleteTrimsTo25(t *testing.T) {
 	if err := in.RespondAutocomplete(context.Background(), "id", "tok", choices); err != nil {
 		t.Fatal(err)
 	}
-	body := s.Last().Body.(map[string]any)
-	got := body["data"].(map[string]any)["choices"].([]map[string]any)
+	body := asType[map[string]any](t, s.Last().Body)
+	got := asType[[]map[string]any](t, asType[map[string]any](t, body["data"])["choices"])
 	if len(got) != 25 {
 		t.Errorf("choices = %d, want 25", len(got))
 	}

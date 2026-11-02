@@ -1,7 +1,6 @@
 package dctl
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -15,7 +14,7 @@ func TestCommandBuildFlat(t *testing.T) {
 			{"type": 5, "name": "verbose", "description": "extra detail"},
 		},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !sameJSON(t, got, want) {
 		t.Fatalf("\ngot  %#v\nwant %#v", got, want)
 	}
 }
@@ -27,16 +26,16 @@ func TestCommandBuildSubAndGroup(t *testing.T) {
 			Group("role", "role ops", Sub("add", "give a role", User("who", "member", true), RoleOpt("role", "role", true))),
 		).JSON()
 
-	opts := got["options"].([]map[string]any)
+	opts := asType[[]map[string]any](t, got["options"])
 	if opts[0]["type"] != optSubCommand || opts[1]["type"] != optSubCommandGroup {
 		t.Fatalf("sub/group types wrong: %#v", opts)
 	}
-	home := opts[0]["options"].([]map[string]any)[0]
-	if home["type"] != optChannel || !reflect.DeepEqual(home["channel_types"], []int{ChannelCategory, ChannelForum}) {
+	home := asType[[]map[string]any](t, opts[0]["options"])[0]
+	if home["type"] != optChannel || !sameJSON(t, home["channel_types"], []int{ChannelCategory, ChannelForum}) {
 		t.Fatalf("channel option wrong: %#v", home)
 	}
-	add := opts[1]["options"].([]map[string]any)[0]
-	if add["type"] != optSubCommand || len(add["options"].([]map[string]any)) != 2 {
+	add := asType[[]map[string]any](t, opts[1]["options"])[0]
+	if add["type"] != optSubCommand || len(asType[[]map[string]any](t, add["options"])) != 2 {
 		t.Fatalf("group sub wrong: %#v", add)
 	}
 }
@@ -53,27 +52,27 @@ func TestCommandFullCoverage(t *testing.T) {
 			String("mode", "pick", false).Autocomplete(),
 		).JSON()
 
-	if got["name_localizations"].(map[string]string)["fr"] != "config" {
+	if asType[map[string]string](t, got["name_localizations"])["fr"] != "config" {
 		t.Errorf("cmd name loc missing: %#v", got["name_localizations"])
 	}
-	if got["default_member_permissions"] != "268435488" { // (1<<5)|(1<<28)
+	if got["default_member_permissions"] != "268435488" {
 		t.Errorf("perms = %v", got["default_member_permissions"])
 	}
 	if got["dm_permission"] != false || got["nsfw"] != true {
 		t.Errorf("dm/nsfw wrong: %#v", got)
 	}
-	opts := got["options"].([]map[string]any)
+	opts := asType[[]map[string]any](t, got["options"])
 	if opts[0]["min_length"] != 1 || opts[0]["max_length"] != 4000 {
 		t.Errorf("len wrong: %#v", opts[0])
 	}
-	if opts[0]["description_localizations"].(map[string]string)["fr"] != "chemin absolu" {
+	if asType[map[string]string](t, opts[0]["description_localizations"])["fr"] != "chemin absolu" {
 		t.Errorf("opt desc loc missing: %#v", opts[0])
 	}
 	if opts[1]["min_value"] != 1.0 || opts[1]["max_value"] != 100.0 {
 		t.Errorf("range wrong: %#v", opts[1])
 	}
-	choice := opts[1]["choices"].([]map[string]any)[0]
-	if choice["value"] != 10 || choice["name_localizations"].(map[string]string)["fr"] != "dix" {
+	choice := asType[[]map[string]any](t, opts[1]["choices"])[0]
+	if choice["value"] != 10 || asType[map[string]string](t, choice["name_localizations"])["fr"] != "dix" {
 		t.Errorf("choice wrong: %#v", choice)
 	}
 	if opts[2]["autocomplete"] != true {
@@ -92,13 +91,11 @@ func TestContextMenuCommandHasNoDescription(t *testing.T) {
 }
 
 func TestContextMenuCommandOmitsDescriptionLocalizations(t *testing.T) {
-	// Loc on a context-menu command may localize the name but must NOT emit
-	// description_localizations (Discord rejects it for type 2/3).
 	got := NewUserCommand("Report").Loc(LocaleFR, "Signaler", "ignored").JSON()
 	if _, ok := got["description_localizations"]; ok {
 		t.Errorf("context-menu command must omit description_localizations: %#v", got)
 	}
-	if got["name_localizations"].(map[string]string)["fr"] != "Signaler" {
+	if asType[map[string]string](t, got["name_localizations"])["fr"] != "Signaler" {
 		t.Errorf("name localization should still be set: %#v", got["name_localizations"])
 	}
 }

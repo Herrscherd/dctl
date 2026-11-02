@@ -3,6 +3,7 @@ package dctl
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -32,14 +33,14 @@ func TestComponentsAck(t *testing.T) {
 		t.Fatal(err)
 	}
 	call := s.Last()
-	if call.Method != "POST" || call.Path != "/interactions/iid/tok/callback" {
+	if call.Method != http.MethodPost || call.Path != "/interactions/iid/tok/callback" {
 		t.Errorf("call = %s %s", call.Method, call.Path)
 	}
-	body := call.Body.(map[string]any)
+	body := asType[map[string]any](t, call.Body)
 	if body["type"] != 7 {
 		t.Errorf("type = %v, want 7", body["type"])
 	}
-	data := body["data"].(map[string]any)
+	data := asType[map[string]any](t, body["data"])
 	if data["content"] != "done" {
 		t.Errorf("content = %v", data["content"])
 	}
@@ -56,11 +57,11 @@ func TestChoiceMenuComponentsShape(t *testing.T) {
 	if len(comps) != 1 || comps[0]["type"] != 1 {
 		t.Fatalf("want a single ACTION_ROW (type 1), got %v", comps)
 	}
-	inner := comps[0]["components"].([]map[string]any)
+	inner := asType[[]map[string]any](t, comps[0]["components"])
 	if len(inner) != 1 || inner[0]["type"] != 3 || inner[0]["custom_id"] != "dctlchoice:s" {
 		t.Fatalf("want a STRING_SELECT (type 3) with our custom_id, got %v", inner)
 	}
-	opts := inner[0]["options"].([]map[string]any)
+	opts := asType[[]map[string]any](t, inner[0]["options"])
 	if len(opts) != 2 || opts[0]["value"] != "1" || opts[1]["description"] != "stop here" {
 		t.Fatalf("options not built as expected: %v", opts)
 	}
@@ -68,14 +69,14 @@ func TestChoiceMenuComponentsShape(t *testing.T) {
 
 func TestClampRuneSafe(t *testing.T) {
 	in := strings.Repeat("é", 60)
-	got := clamp(in, 100)
+	got := clamp(in)
 	if r := []rune(got); len(r) != 60 {
 		t.Fatalf("clamp shortened a sub-limit string: %d runes", len(r))
 	}
 	long := strings.Repeat("é", 150)
-	got = clamp(long, 100)
+	got = clamp(long)
 	if r := []rune(got); len(r) != 100 {
-		t.Fatalf("clamp(150 runes,100) = %d runes, want 100", len(r))
+		t.Fatalf("clamp(150 runes) = %d runes, want 100", len(r))
 	}
 }
 

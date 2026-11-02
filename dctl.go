@@ -1,6 +1,7 @@
 package dctl
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -20,6 +21,7 @@ type ClientOption func(*clientConfig)
 
 type clientConfig struct {
 	httpClient *http.Client
+	logger     *slog.Logger
 	guild      string
 	global     bool
 }
@@ -29,16 +31,23 @@ func WithHTTPClient(h *http.Client) ClientOption {
 	return func(c *clientConfig) { c.httpClient = h }
 }
 
+// WithLogger sets the logger that reports a response body that fails to read or
+// close, unless the call already fails with that error. Without it those reports
+// are discarded.
+func WithLogger(logger *slog.Logger) ClientOption {
+	return func(c *clientConfig) { c.logger = logger }
+}
+
 // WithGuild pins the guild that guild-scoped ops target when no explicit id is
 // passed. Without it they fall back to Guilds().Sole, which errors when the bot
-// is in more than one server — a bot invited to a second guild would otherwise
+// is in more than one server. A bot invited to a second guild would otherwise
 // lose command registration entirely.
 func WithGuild(id string) ClientOption {
 	return func(c *clientConfig) { c.guild = id }
 }
 
 // WithGlobalCommands registers slash commands on the application rather than on
-// one guild, so every server the bot is in gets them — the only scope that
+// one guild, so every server the bot is in gets them. It is the only scope that
 // works for a bot meant to be installed anywhere. Guild commands appear
 // instantly and global ones take up to an hour to propagate, which is why they
 // stay the default. Other guild-scoped ops are unaffected.
@@ -57,22 +66,24 @@ func New(token, defaultChannel string, opts ...ClientOption) *Client {
 	if cfg.httpClient != nil {
 		topts = append(topts, transport.WithHTTPClient(cfg.httpClient))
 	}
+	if cfg.logger != nil {
+		topts = append(topts, transport.WithLogger(cfg.logger))
+	}
 	rt := transport.NewHTTP(token, topts...)
-	c := newWith(rt, defaultChannel)
-	c.def.guild = cfg.guild
-	c.def.globalCommands = cfg.global
-	return c
+	client := newWith(rt, defaultChannel)
+	client.def.guild = cfg.guild
+	client.def.globalCommands = cfg.global
+	return client
 }
 
-// newWith wires a Client around an arbitrary Doer (used by tests with a stub).
-func newWith(rt transport.Doer, defaultChannel string) *Client {
-	guilds := &Guilds{rt: rt}
-	def := &defaults{rt: rt, channel: defaultChannel, guilds: guilds}
+func newWith(doer transport.Doer, defaultChannel string) *Client {
+	guilds := &Guilds{rt: doer}
+	def := &defaults{rt: doer, channel: defaultChannel, guilds: guilds}
 	return &Client{
-		rt:           rt,
+		rt:           doer,
 		def:          def,
 		guilds:       guilds,
-		interactions: &Interactions{rt: rt, def: def},
+		interactions: &Interactions{rt: doer, def: def},
 	}
 }
 
@@ -87,16 +98,35 @@ func (c *Client) DefaultChannel() string {
 	return c.def.channel
 }
 
-// Sub-client accessors. Each shares the transport and (where relevant) the
-// default channel/guild resolver.
-func (c *Client) Guilds() *Guilds             { return c.guilds }
-func (c *Client) Messages() *Messages         { return &Messages{rt: c.rt, def: c.def} }
-func (c *Client) Channels() *Channels         { return &Channels{rt: c.rt, def: c.def} }
-func (c *Client) Roles() *Roles               { return &Roles{rt: c.rt, def: c.def} }
-func (c *Client) Members() *Members           { return &Members{rt: c.rt, def: c.def} }
-func (c *Client) Reactions() *Reactions       { return &Reactions{rt: c.rt, def: c.def} }
-func (c *Client) Threads() *Threads           { return &Threads{rt: c.rt, def: c.def} }
-func (c *Client) Permissions() *Permissions   { return &Permissions{rt: c.rt} }
-func (c *Client) Webhooks() *Webhooks         { return &Webhooks{rt: c.rt} }
+// Guilds returns the client for the servers the bot is in.
+func (c *Client) Guilds() *Guilds { return c.guilds }
+
+// Messages returns the client for messages.
+func (c *Client) Messages() *Messages { return &Messages{rt: c.rt, def: c.def} }
+
+// Channels returns the client for channels.
+func (c *Client) Channels() *Channels { return &Channels{rt: c.rt, def: c.def} }
+
+// Roles returns the client for server roles.
+func (c *Client) Roles() *Roles { return &Roles{rt: c.rt, def: c.def} }
+
+// Members returns the client for server members.
+func (c *Client) Members() *Members { return &Members{rt: c.rt, def: c.def} }
+
+// Reactions returns the client for message reactions.
+func (c *Client) Reactions() *Reactions { return &Reactions{rt: c.rt, def: c.def} }
+
+// Threads returns the client for threads.
+func (c *Client) Threads() *Threads { return &Threads{rt: c.rt, def: c.def} }
+
+// Permissions returns the client for channel permission overwrites.
+func (c *Client) Permissions() *Permissions { return &Permissions{rt: c.rt} }
+
+// Webhooks returns the client for webhooks.
+func (c *Client) Webhooks() *Webhooks { return &Webhooks{rt: c.rt} }
+
+// Interactions returns the client that answers interactions.
 func (c *Client) Interactions() *Interactions { return c.interactions }
-func (c *Client) Components() *Components     { return &Components{rt: c.rt, def: c.def} }
+
+// Components returns the client for message components.
+func (c *Client) Components() *Components { return &Components{rt: c.rt, def: c.def} }

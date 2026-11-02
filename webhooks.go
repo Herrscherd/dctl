@@ -19,15 +19,17 @@ type Webhooks struct {
 	rt transport.Doer
 }
 
+// Create makes a webhook in a channel and returns it.
 func (w *Webhooks) Create(ctx context.Context, channelID, name string) (*Webhook, error) {
 	var hook Webhook
 	if err := w.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/webhooks",
-		map[string]any{"name": name}, &hook); err != nil {
+		map[string]any{fieldName: name}, &hook); err != nil {
 		return nil, err
 	}
 	return &hook, nil
 }
 
+// List returns the webhooks of a channel.
 func (w *Webhooks) List(ctx context.Context, channelID string) ([]Webhook, error) {
 	var hooks []Webhook
 	if err := w.rt.Do(ctx, http.MethodGet, "/channels/"+seg(channelID)+"/webhooks", nil, &hooks); err != nil {
@@ -36,6 +38,7 @@ func (w *Webhooks) List(ctx context.Context, channelID string) ([]Webhook, error
 	return hooks, nil
 }
 
+// Delete removes the webhook with the given ID.
 func (w *Webhooks) Delete(ctx context.Context, webhookID string) error {
 	return w.rt.Do(ctx, http.MethodDelete, "/webhooks/"+seg(webhookID), nil, nil)
 }
@@ -43,5 +46,5 @@ func (w *Webhooks) Delete(ctx context.Context, webhookID string) error {
 // Execute posts content through a webhook using its id+token.
 func (w *Webhooks) Execute(ctx context.Context, webhookID, token, content string) error {
 	return w.rt.Do(ctx, http.MethodPost, "/webhooks/"+seg(webhookID)+"/"+seg(token),
-		map[string]any{"content": content}, nil)
+		map[string]any{fieldContent: content}, nil)
 }

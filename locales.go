@@ -3,37 +3,38 @@ package dctl
 // Locale is a Discord locale code for command/option/choice localization.
 type Locale string
 
+// Locales are the locale codes Discord accepts for localized names and descriptions.
 const (
-	LocaleID    Locale = "id"     // Indonesian
-	LocaleDA    Locale = "da"     // Danish
-	LocaleDE    Locale = "de"     // German
-	LocaleEnGB  Locale = "en-GB"  // English, UK
-	LocaleEnUS  Locale = "en-US"  // English, US
-	LocaleEsES  Locale = "es-ES"  // Spanish
-	LocaleEs419 Locale = "es-419" // Spanish, LATAM
-	LocaleFR    Locale = "fr"     // French
-	LocaleHR    Locale = "hr"     // Croatian
-	LocaleIT    Locale = "it"     // Italian
-	LocaleLT    Locale = "lt"     // Lithuanian
-	LocaleHU    Locale = "hu"     // Hungarian
-	LocaleNL    Locale = "nl"     // Dutch
-	LocaleNO    Locale = "no"     // Norwegian
-	LocalePL    Locale = "pl"     // Polish
-	LocalePtBR  Locale = "pt-BR"  // Portuguese, Brazilian
-	LocaleRO    Locale = "ro"     // Romanian
-	LocaleFI    Locale = "fi"     // Finnish
-	LocaleSvSE  Locale = "sv-SE"  // Swedish
-	LocaleVI    Locale = "vi"     // Vietnamese
-	LocaleTR    Locale = "tr"     // Turkish
-	LocaleCS    Locale = "cs"     // Czech
-	LocaleEL    Locale = "el"     // Greek
-	LocaleBG    Locale = "bg"     // Bulgarian
-	LocaleRU    Locale = "ru"     // Russian
-	LocaleUK    Locale = "uk"     // Ukrainian
-	LocaleHI    Locale = "hi"     // Hindi
-	LocaleTH    Locale = "th"     // Thai
-	LocaleZhCN  Locale = "zh-CN"  // Chinese, China
-	LocaleJA    Locale = "ja"     // Japanese
-	LocaleZhTW  Locale = "zh-TW"  // Chinese, Taiwan
-	LocaleKO    Locale = "ko"     // Korean
+	LocaleID    Locale = "id"
+	LocaleDA    Locale = "da"
+	LocaleDE    Locale = "de"
+	LocaleEnGB  Locale = "en-GB"
+	LocaleEnUS  Locale = "en-US"
+	LocaleEsES  Locale = "es-ES"
+	LocaleEs419 Locale = "es-419"
+	LocaleFR    Locale = "fr"
+	LocaleHR    Locale = "hr"
+	LocaleIT    Locale = "it"
+	LocaleLT    Locale = "lt"
+	LocaleHU    Locale = "hu"
+	LocaleNL    Locale = "nl"
+	LocaleNO    Locale = "no"
+	LocalePL    Locale = "pl"
+	LocalePtBR  Locale = "pt-BR"
+	LocaleRO    Locale = "ro"
+	LocaleFI    Locale = "fi"
+	LocaleSvSE  Locale = "sv-SE"
+	LocaleVI    Locale = "vi"
+	LocaleTR    Locale = "tr"
+	LocaleCS    Locale = "cs"
+	LocaleEL    Locale = "el"
+	LocaleBG    Locale = "bg"
+	LocaleRU    Locale = "ru"
+	LocaleUK    Locale = "uk"
+	LocaleHI    Locale = "hi"
+	LocaleTH    Locale = "th"
+	LocaleZhCN  Locale = "zh-CN"
+	LocaleJA    Locale = "ja"
+	LocaleZhTW  Locale = "zh-TW"
+	LocaleKO    Locale = "ko"
 )

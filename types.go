@@ -1,7 +1,3 @@
-// Package dctl is a pure CLI client for the Discord bot REST API (v10).
-// Auth is a bot token sent as `Authorization: Bot <token>`. No gateway/websocket:
-// every call is on-demand HTTP. Mono-server by design (one bot token, one default
-// channel).
 package dctl
 
 // Secret is a token-like string that redacts itself in logs (%v, %+v, %#v) and
@@ -9,10 +5,17 @@ package dctl
 // send it (e.g. Webhooks.Execute).
 type Secret string
 
-func (Secret) String() string               { return "[REDACTED]" }
-func (Secret) GoString() string             { return "[REDACTED]" }
+func (Secret) String() string { return "[REDACTED]" }
+
+// GoString returns the redacted form, so %#v does not print the secret either.
+func (Secret) GoString() string { return "[REDACTED]" }
+
+// MarshalJSON encodes the secret as the redacted form, so it never reaches a
+// JSON payload by accident.
 func (Secret) MarshalJSON() ([]byte, error) { return []byte(`"[REDACTED]"`), nil }
-func (s Secret) Reveal() string             { return string(s) }
+
+// Reveal returns the secret value. Call it only where the value must be sent.
+func (s Secret) Reveal() string { return string(s) }
 
 // Author identifies who wrote a message.
 type Author struct {

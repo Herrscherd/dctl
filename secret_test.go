@@ -35,7 +35,6 @@ func TestWebhookTokenRedactedInLogsAndJSON(t *testing.T) {
 		t.Errorf("json.Marshal leaked webhook token: %s", b)
 	}
 
-	// The value still round-trips IN from Discord and is usable via Reveal.
 	var in Webhook
 	if err := json.Unmarshal([]byte(`{"id":"1","name":"hook","token":"secret-token"}`), &in); err != nil {
 		t.Fatal(err)

@@ -19,11 +19,11 @@ func (r *Roles) List(ctx context.Context, guildID string) ([]Role, error) {
 	if err != nil {
 		return nil, err
 	}
-	var rs []Role
-	if err := r.rt.Do(ctx, http.MethodGet, "/guilds/"+seg(gid)+"/roles", nil, &rs); err != nil {
+	var roles []Role
+	if err := r.rt.Do(ctx, http.MethodGet, "/guilds/"+seg(gid)+"/roles", nil, &roles); err != nil {
 		return nil, err
 	}
-	return rs, nil
+	return roles, nil
 }
 
 // Create creates a role named name in guildID (or the sole guild).
@@ -34,7 +34,7 @@ func (r *Roles) Create(ctx context.Context, guildID, name string) (*Role, error)
 	}
 	var role Role
 	if err := r.rt.Do(ctx, http.MethodPost, "/guilds/"+seg(gid)+"/roles",
-		map[string]any{"name": name}, &role); err != nil {
+		map[string]any{fieldName: name}, &role); err != nil {
 		return nil, err
 	}
 	return &role, nil
@@ -53,6 +53,7 @@ func (r *Roles) Update(ctx context.Context, guildID, roleID string, fields map[s
 	return &role, nil
 }
 
+// Delete removes a role from a server. The server is resolved as in [Members.Get].
 func (r *Roles) Delete(ctx context.Context, guildID, roleID string) error {
 	gid, err := r.def.resolveGuild(ctx, guildID)
 	if err != nil {
