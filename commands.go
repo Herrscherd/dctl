@@ -161,12 +161,15 @@ func leaf(typ int, name, desc string, required bool) Option {
 }
 
 func String(name, desc string, required bool) Option { return leaf(optString, name, desc, required) }
-func Int(name, desc string, required bool) Option    { return leaf(optInteger, name, desc, required) }
-func Bool(name, desc string, required bool) Option   { return leaf(optBoolean, name, desc, required) }
-func User(name, desc string, required bool) Option   { return leaf(optUser, name, desc, required) }
+
+func Int(name, desc string, required bool) Option { return leaf(optInteger, name, desc, required) }
+
+func Bool(name, desc string, required bool) Option { return leaf(optBoolean, name, desc, required) }
+func User(name, desc string, required bool) Option { return leaf(optUser, name, desc, required) }
 func Mentionable(name, desc string, required bool) Option {
 	return leaf(optMentionable, name, desc, required)
 }
+
 func Number(name, desc string, required bool) Option { return leaf(optNumber, name, desc, required) }
 
 // ChannelOpt, RoleOpt and AttachmentOpt carry the -Opt suffix to avoid clashing
