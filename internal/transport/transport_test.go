@@ -61,8 +61,15 @@ func TestHTTPDoSurfacesAPIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error")
 	}
-	if want := "discord 403"; !strings.Contains(err.Error(), want) {
-		t.Errorf("err = %q, want containing %q", err.Error(), want)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("err = %T %v, want *APIError", err, err)
+	}
+	if apiErr.Status != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", apiErr.Status, http.StatusForbidden)
+	}
+	if !strings.Contains(apiErr.Body, "Missing Permissions") {
+		t.Errorf("body = %q, want the Discord message", apiErr.Body)
 	}
 }
 
