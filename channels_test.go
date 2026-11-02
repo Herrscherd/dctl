@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -22,7 +23,7 @@ func TestChannelsCreate(t *testing.T) {
 		t.Fatalf("channel = %+v", ch)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/guilds/g1/channels" {
+	if c.Method != http.MethodPost || c.Path != "/guilds/g1/channels" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 	if asType[map[string]any](t, c.Body)["name"] != "logs" {
@@ -40,7 +41,7 @@ func TestChannelsRename(t *testing.T) {
 		t.Fatalf("name = %q", ch.Name)
 	}
 	c := s.Last()
-	if c.Method != "PATCH" || c.Path != "/channels/c1" {
+	if c.Method != http.MethodPatch || c.Path != "/channels/c1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -56,7 +57,7 @@ func TestChannelsEnsureUnderReuses(t *testing.T) {
 	if ch.ID != "c9" {
 		t.Fatalf("expected reuse of c9, got %+v", ch)
 	}
-	if c := s.Last(); c.Method != "GET" {
+	if c := s.Last(); c.Method != http.MethodGet {
 		t.Errorf("reuse should not create, last call = %s %s", c.Method, c.Path)
 	}
 }
@@ -74,7 +75,7 @@ func TestChannelsEnsureUnderCreates(t *testing.T) {
 		t.Fatalf("expected new c10, got %+v", ch)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/guilds/g1/channels" {
+	if c.Method != http.MethodPost || c.Path != "/guilds/g1/channels" {
 		t.Fatalf("create call = %s %s", c.Method, c.Path)
 	}
 	if asType[map[string]any](t, c.Body)["parent_id"] != "p1" {
@@ -107,7 +108,7 @@ func TestChannelsDelete(t *testing.T) {
 	if err := chans(s).Delete(context.Background(), "c1"); err != nil {
 		t.Fatal(err)
 	}
-	if c := s.Last(); c.Method != "DELETE" || c.Path != "/channels/c1" {
+	if c := s.Last(); c.Method != http.MethodDelete || c.Path != "/channels/c1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }

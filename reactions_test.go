@@ -2,6 +2,8 @@ package dctl
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -16,7 +18,7 @@ func TestReactionsAddEncodesEmoji(t *testing.T) {
 	}
 	c := s.Last()
 	wantPath := "/channels/c/messages/m/reactions/" + url.PathEscape("👍") + "/@me"
-	if c.Method != "PUT" || c.Path != wantPath {
+	if c.Method != http.MethodPut || c.Path != wantPath {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -27,7 +29,7 @@ func TestReactionsRemove(t *testing.T) {
 	if err := r.Remove(context.Background(), "c", "m", "👍"); err != nil {
 		t.Fatal(err)
 	}
-	if c := s.Last(); c.Method != "DELETE" {
+	if c := s.Last(); c.Method != http.MethodDelete {
 		t.Errorf("method = %s", c.Method)
 	}
 }
@@ -45,7 +47,7 @@ func TestReactionsUsesDefaultChannel(t *testing.T) {
 
 func TestReactionsNoChannel(t *testing.T) {
 	r := &Reactions{rt: transport.NewStub(), def: &defaults{}}
-	if err := r.Add(context.Background(), "", "m", "x"); err != ErrNoChannel {
+	if err := r.Add(context.Background(), "", "m", "x"); !errors.Is(err, ErrNoChannel) {
 		t.Errorf("err = %v, want ErrNoChannel", err)
 	}
 }

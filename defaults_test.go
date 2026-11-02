@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -25,7 +26,7 @@ func TestDefaultsResolveChannelFallsBackToDefault(t *testing.T) {
 
 func TestDefaultsResolveChannelErrorsWhenNone(t *testing.T) {
 	d := &defaults{}
-	if _, err := d.resolveChannel(""); err != ErrNoChannel {
+	if _, err := d.resolveChannel(""); !errors.Is(err, ErrNoChannel) {
 		t.Fatalf("err = %v, want ErrNoChannel", err)
 	}
 }

@@ -35,7 +35,7 @@ func TestHTTPDoSetsAuthAndDecodes(t *testing.T) {
 	if gotUA == "" {
 		t.Error("missing user-agent")
 	}
-	if gotMethod != "GET" || gotPath != "/x" {
+	if gotMethod != http.MethodGet || gotPath != "/x" {
 		t.Errorf("method/path = %s %s", gotMethod, gotPath)
 	}
 	if out.ID != "42" {
@@ -45,7 +45,7 @@ func TestHTTPDoSetsAuthAndDecodes(t *testing.T) {
 
 func TestHTTPDoDisabledWithoutToken(t *testing.T) {
 	rt := NewHTTP("")
-	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != ErrDisabled {
+	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); !errors.Is(err, ErrDisabled) {
 		t.Errorf("err = %v, want ErrDisabled", err)
 	}
 }
@@ -76,7 +76,7 @@ func TestHTTPDoTransportErrorDoesNotLeakToken(t *testing.T) {
 	if strings.Contains(err.Error(), secret) {
 		t.Fatalf("error leaks token: %q", err.Error())
 	}
-	if !strings.Contains(err.Error(), "POST") {
+	if !strings.Contains(err.Error(), http.MethodPost) {
 		t.Fatalf("error dropped method context: %q", err.Error())
 	}
 }
@@ -205,6 +205,7 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { re
 
 type closeFailingBody struct {
 	io.Reader
+
 	err error
 }
 

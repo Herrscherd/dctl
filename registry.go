@@ -113,28 +113,35 @@ func (r *Registry) Sync(ctx context.Context) error {
 		return &SyncWouldDeleteError{Count: len(existing)}
 	}
 
-	byName := make(map[string]RegisteredCommand, len(existing))
-	for _, c := range existing {
-		byName[c.Name] = c
+	if err := r.upsertCommands(ctx, base, desired, existing); err != nil {
+		return err
 	}
 	keep := make(map[string]bool, len(desired))
 	for _, d := range desired {
 		keep[d.name] = true
-		if cur, ok := byName[d.name]; ok {
-			if err := r.in.rt.Do(ctx, http.MethodPatch, base+"/"+seg(cur.ID), d.body, nil); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := r.in.rt.Do(ctx, http.MethodPost, base, d.body, nil); err != nil {
-			return err
-		}
 	}
 	for _, c := range existing {
 		if !keep[c.Name] {
 			if err := r.in.rt.Do(ctx, http.MethodDelete, base+"/"+seg(c.ID), nil, nil); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (r *Registry) upsertCommands(ctx context.Context, base string, desired []desiredCmd, existing []RegisteredCommand) error {
+	byName := make(map[string]RegisteredCommand, len(existing))
+	for _, c := range existing {
+		byName[c.Name] = c
+	}
+	for _, d := range desired {
+		method, path := http.MethodPost, base
+		if cur, ok := byName[d.name]; ok {
+			method, path = http.MethodPatch, base+"/"+seg(cur.ID)
+		}
+		if err := r.in.rt.Do(ctx, method, path, d.body, nil); err != nil {
+			return err
 		}
 	}
 	return nil

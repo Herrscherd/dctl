@@ -22,7 +22,7 @@ type Webhooks struct {
 func (w *Webhooks) Create(ctx context.Context, channelID, name string) (*Webhook, error) {
 	var hook Webhook
 	if err := w.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/webhooks",
-		map[string]any{"name": name}, &hook); err != nil {
+		map[string]any{fieldName: name}, &hook); err != nil {
 		return nil, err
 	}
 	return &hook, nil
@@ -43,5 +43,5 @@ func (w *Webhooks) Delete(ctx context.Context, webhookID string) error {
 // Execute posts content through a webhook using its id+token.
 func (w *Webhooks) Execute(ctx context.Context, webhookID, token, content string) error {
 	return w.rt.Do(ctx, http.MethodPost, "/webhooks/"+seg(webhookID)+"/"+seg(token),
-		map[string]any{"content": content}, nil)
+		map[string]any{fieldContent: content}, nil)
 }

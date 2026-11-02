@@ -24,16 +24,16 @@ type Components struct {
 func choiceMenuComponents(customID string, options []SelectOption) []map[string]any {
 	opts := make([]map[string]any, 0, len(options))
 	for _, o := range options {
-		m := map[string]any{"label": clamp(o.Label, 100), "value": clamp(o.Value, 100)}
+		m := map[string]any{"label": clamp(o.Label), fieldValue: clamp(o.Value)}
 		if o.Description != "" {
-			m["description"] = clamp(o.Description, 100)
+			m["description"] = clamp(o.Description)
 		}
 		opts = append(opts, m)
 	}
 	return []map[string]any{{
-		"type": 1,
-		"components": []map[string]any{{
-			"type":      3,
+		fieldType: 1,
+		fieldComponents: []map[string]any{{
+			fieldType:   componentStringSelect,
 			"custom_id": customID,
 			"options":   opts,
 		}},
@@ -48,8 +48,8 @@ func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, con
 		return nil, err
 	}
 	body := map[string]any{
-		"content":    content,
-		"components": choiceMenuComponents(customID, options),
+		fieldContent:    content,
+		fieldComponents: choiceMenuComponents(customID, options),
 	}
 	if replyTo != "" {
 		body["message_reference"] = map[string]any{"message_id": replyTo, "fail_if_not_exists": false}
@@ -66,13 +66,14 @@ func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, con
 // and the dropdown can't be used twice. Must be sent within Discord's 3s deadline.
 func (c *Components) Ack(ctx context.Context, id, token, content string) error {
 	body := map[string]any{
-		"type": 7,
-		"data": map[string]any{"content": content, "components": []any{}},
+		fieldType: callbackUpdateMessage,
+		fieldData: map[string]any{fieldContent: content, fieldComponents: []any{}},
 	}
 	return c.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback", body, nil)
 }
 
-func clamp(s string, limit int) string {
+func clamp(s string) string {
+	limit := maxOptionText
 	if len(s) <= limit {
 		return s
 	}

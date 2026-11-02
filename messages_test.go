@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -46,7 +47,7 @@ func TestMessagesEdit(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "PATCH" || c.Path != "/channels/c/messages/m1" {
+	if c.Method != http.MethodPatch || c.Path != "/channels/c/messages/m1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -60,7 +61,7 @@ func TestMessagesGetFetchesOneMessageByID(t *testing.T) {
 	if got.ID != "m1" || got.Content != "look at this" {
 		t.Fatalf("msg = %+v", got)
 	}
-	if c := s.Last(); c.Method != "GET" || c.Path != "/channels/c/messages/m1" {
+	if c := s.Last(); c.Method != http.MethodGet || c.Path != "/channels/c/messages/m1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -122,7 +123,7 @@ func TestMessagesDelete(t *testing.T) {
 	if err := msgs(s, "").Delete(context.Background(), "c", "m1"); err != nil {
 		t.Fatal(err)
 	}
-	if c := s.Last(); c.Method != "DELETE" || c.Path != "/channels/c/messages/m1" {
+	if c := s.Last(); c.Method != http.MethodDelete || c.Path != "/channels/c/messages/m1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }

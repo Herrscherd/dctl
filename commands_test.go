@@ -1,7 +1,6 @@
 package dctl
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -15,7 +14,7 @@ func TestCommandBuildFlat(t *testing.T) {
 			{"type": 5, "name": "verbose", "description": "extra detail"},
 		},
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !sameJSON(t, got, want) {
 		t.Fatalf("\ngot  %#v\nwant %#v", got, want)
 	}
 }
@@ -32,7 +31,7 @@ func TestCommandBuildSubAndGroup(t *testing.T) {
 		t.Fatalf("sub/group types wrong: %#v", opts)
 	}
 	home := asType[[]map[string]any](t, opts[0]["options"])[0]
-	if home["type"] != optChannel || !reflect.DeepEqual(home["channel_types"], []int{ChannelCategory, ChannelForum}) {
+	if home["type"] != optChannel || !sameJSON(t, home["channel_types"], []int{ChannelCategory, ChannelForum}) {
 		t.Fatalf("channel option wrong: %#v", home)
 	}
 	add := asType[[]map[string]any](t, opts[1]["options"])[0]

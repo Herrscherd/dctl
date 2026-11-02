@@ -3,6 +3,7 @@ package dctl
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestComponentsAck(t *testing.T) {
 		t.Fatal(err)
 	}
 	call := s.Last()
-	if call.Method != "POST" || call.Path != "/interactions/iid/tok/callback" {
+	if call.Method != http.MethodPost || call.Path != "/interactions/iid/tok/callback" {
 		t.Errorf("call = %s %s", call.Method, call.Path)
 	}
 	body := asType[map[string]any](t, call.Body)
@@ -68,14 +69,14 @@ func TestChoiceMenuComponentsShape(t *testing.T) {
 
 func TestClampRuneSafe(t *testing.T) {
 	in := strings.Repeat("é", 60)
-	got := clamp(in, 100)
+	got := clamp(in)
 	if r := []rune(got); len(r) != 60 {
 		t.Fatalf("clamp shortened a sub-limit string: %d runes", len(r))
 	}
 	long := strings.Repeat("é", 150)
-	got = clamp(long, 100)
+	got = clamp(long)
 	if r := []rune(got); len(r) != 100 {
-		t.Fatalf("clamp(150 runes,100) = %d runes, want 100", len(r))
+		t.Fatalf("clamp(150 runes) = %d runes, want 100", len(r))
 	}
 }
 
