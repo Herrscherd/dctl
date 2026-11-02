@@ -41,20 +41,20 @@ func (c *Channels) List(ctx context.Context, guildID string) ([]Channel, error) 
 
 // Get returns the channel with the given ID.
 func (c *Channels) Get(ctx context.Context, channelID string) (*Channel, error) {
-	var ch Channel
-	if err := c.rt.Do(ctx, http.MethodGet, "/channels/"+seg(channelID), nil, &ch); err != nil {
+	var channel Channel
+	if err := c.rt.Do(ctx, http.MethodGet, "/channels/"+seg(channelID), nil, &channel); err != nil {
 		return nil, err
 	}
-	return &ch, nil
+	return &channel, nil
 }
 
 // Type returns the Discord channel-type integer for channelID.
 func (c *Channels) Type(ctx context.Context, channelID string) (int, error) {
-	ch, err := c.Get(ctx, channelID)
+	channel, err := c.Get(ctx, channelID)
 	if err != nil {
 		return 0, err
 	}
-	return ch.Type, nil
+	return channel.Type, nil
 }
 
 // Create creates a text channel named name in guildID (or the sole guild).
@@ -76,11 +76,11 @@ func (c *Channels) guildOf(ctx context.Context, channelID string) (string, error
 	if channelID == "" {
 		return "", nil
 	}
-	ch, err := c.Get(ctx, channelID)
+	channel, err := c.Get(ctx, channelID)
 	if err != nil {
 		return "", err
 	}
-	return ch.GuildID, nil
+	return channel.GuildID, nil
 }
 
 func (c *Channels) create(ctx context.Context, guildID string, body map[string]any) (*Channel, error) {
@@ -88,11 +88,11 @@ func (c *Channels) create(ctx context.Context, guildID string, body map[string]a
 	if err != nil {
 		return nil, err
 	}
-	var ch Channel
-	if err := c.rt.Do(ctx, http.MethodPost, "/guilds/"+seg(gid)+"/channels", body, &ch); err != nil {
+	var channel Channel
+	if err := c.rt.Do(ctx, http.MethodPost, "/guilds/"+seg(gid)+"/channels", body, &channel); err != nil {
 		return nil, err
 	}
-	return &ch, nil
+	return &channel, nil
 }
 
 // Rename sets the name of a channel and returns the updated channel.
@@ -102,11 +102,11 @@ func (c *Channels) Rename(ctx context.Context, channelID, name string) (*Channel
 
 // Update PATCHes arbitrary channel fields (name, parent_id, topic, position…).
 func (c *Channels) Update(ctx context.Context, channelID string, fields map[string]any) (*Channel, error) {
-	var ch Channel
-	if err := c.rt.Do(ctx, http.MethodPatch, "/channels/"+seg(channelID), fields, &ch); err != nil {
+	var channel Channel
+	if err := c.rt.Do(ctx, http.MethodPatch, "/channels/"+seg(channelID), fields, &channel); err != nil {
 		return nil, err
 	}
-	return &ch, nil
+	return &channel, nil
 }
 
 // Delete removes a channel. It returns [ErrNoChannel] when channelID is empty.
@@ -124,9 +124,9 @@ func (c *Channels) Ensure(ctx context.Context, guildID, name string) (*Channel, 
 	if err != nil {
 		return nil, err
 	}
-	for i := range chs {
-		if chs[i].Type == ChannelText && strings.EqualFold(chs[i].Name, name) {
-			return &chs[i], nil
+	for index := range chs {
+		if chs[index].Type == ChannelText && strings.EqualFold(chs[index].Name, name) {
+			return &chs[index], nil
 		}
 	}
 	return c.Create(ctx, guildID, name)
@@ -144,9 +144,9 @@ func (c *Channels) EnsureUnder(ctx context.Context, parentID, name string) (*Cha
 	if err != nil {
 		return nil, err
 	}
-	for i := range chs {
-		if chs[i].Type == ChannelText && chs[i].ParentID == parentID && strings.EqualFold(chs[i].Name, name) {
-			return &chs[i], nil
+	for index := range chs {
+		if chs[index].Type == ChannelText && chs[index].ParentID == parentID && strings.EqualFold(chs[index].Name, name) {
+			return &chs[index], nil
 		}
 	}
 	return c.create(ctx, gid, map[string]any{fieldName: name, fieldType: ChannelText, "parent_id": parentID})
@@ -157,11 +157,11 @@ func (c *Channels) EnsureUnder(ctx context.Context, parentID, name string) (*Cha
 //
 // It fails when the channel type cannot be read, or when Discord rejects the request.
 func (c *Channels) Archive(ctx context.Context, channelID string) error {
-	ct, err := c.Type(ctx, channelID)
+	channelType, err := c.Type(ctx, channelID)
 	if err != nil {
 		return err
 	}
-	if ct == ChannelNewsThread || ct == ChannelPublicThread || ct == ChannelPrivateThread {
+	if channelType == ChannelNewsThread || channelType == ChannelPublicThread || channelType == ChannelPrivateThread {
 		return c.rt.Do(ctx, http.MethodPatch, "/channels/"+seg(channelID), map[string]any{"archived": true}, nil)
 	}
 	return c.Delete(ctx, channelID)

@@ -28,10 +28,10 @@ func (r *Reactions) Remove(ctx context.Context, channelID, messageID, emoji stri
 }
 
 func (r *Reactions) do(ctx context.Context, method, channelID, messageID, emoji string) error {
-	ch, err := r.def.resolveChannel(channelID)
+	channel, err := r.def.resolveChannel(channelID)
 	if err != nil {
 		return err
 	}
-	path := "/channels/" + seg(ch) + "/messages/" + seg(messageID) + "/reactions/" + seg(emoji) + "/@me"
+	path := "/channels/" + seg(channel) + "/messages/" + seg(messageID) + "/reactions/" + seg(emoji) + "/@me"
 	return r.rt.Do(ctx, method, path, nil, nil)
 }

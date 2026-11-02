@@ -74,12 +74,12 @@ func NewMessageCommand(name string) *Command { return &Command{typ: cmdMessage, 
 func (c *Command) Name() string { return c.name }
 
 // Loc adds a localized name and description for one locale.
-func (c *Command) Loc(l Locale, name, description string) *Command {
+func (c *Command) Loc(locale Locale, name, description string) *Command {
 	if c.nameLoc == nil {
 		c.nameLoc, c.descLoc = make(map[string]string), make(map[string]string)
 	}
-	c.nameLoc[string(l)] = name
-	c.descLoc[string(l)] = description
+	c.nameLoc[string(locale)] = name
+	c.descLoc[string(locale)] = description
 	return c
 }
 
@@ -111,29 +111,29 @@ func (c *Command) With(opts ...Option) *Command {
 func (c *Command) JSON() map[string]any { return c.build() }
 
 func (c *Command) build() map[string]any {
-	m := map[string]any{fieldName: c.name, fieldType: c.typ}
+	fields := map[string]any{fieldName: c.name, fieldType: c.typ}
 	if c.typ == cmdChatInput {
-		m["description"] = c.desc
+		fields["description"] = c.desc
 		if len(c.descLoc) > 0 {
-			m["description_localizations"] = c.descLoc
+			fields["description_localizations"] = c.descLoc
 		}
 	}
 	if len(c.nameLoc) > 0 {
-		m["name_localizations"] = c.nameLoc
+		fields["name_localizations"] = c.nameLoc
 	}
 	if c.perms != nil {
-		m["default_member_permissions"] = *c.perms
+		fields["default_member_permissions"] = *c.perms
 	}
 	if c.dmPerm != nil {
-		m["dm_permission"] = *c.dmPerm
+		fields["dm_permission"] = *c.dmPerm
 	}
 	if c.nsfw {
-		m["nsfw"] = true
+		fields["nsfw"] = true
 	}
 	if len(c.options) > 0 {
-		m["options"] = buildOptions(c.options)
+		fields["options"] = buildOptions(c.options)
 	}
-	return m
+	return fields
 }
 
 // Option builds a command option, sub-command, or group.
@@ -218,9 +218,9 @@ func Group(name, desc string, subs ...Option) Option {
 }
 
 // Loc adds a localized name and description for one locale.
-func (o Option) Loc(l Locale, name, desc string) Option {
-	o.nameLoc = cloneSet(o.nameLoc, string(l), name)
-	o.descLoc = cloneSet(o.descLoc, string(l), desc)
+func (o Option) Loc(locale Locale, name, desc string) Option {
+	o.nameLoc = cloneSet(o.nameLoc, string(locale), name)
+	o.descLoc = cloneSet(o.descLoc, string(locale), desc)
 	return o
 }
 
@@ -240,45 +240,45 @@ func (o Option) ChannelTypes(types ...int) Option { o.channelTypes = types; retu
 func (o Option) Autocomplete() Option { o.autocomplete = true; return o }
 
 func (o Option) build() map[string]any {
-	m := map[string]any{fieldType: o.typ, fieldName: o.name, "description": o.desc}
+	fields := map[string]any{fieldType: o.typ, fieldName: o.name, "description": o.desc}
 	if o.required {
-		m["required"] = true
+		fields["required"] = true
 	}
 	if len(o.nameLoc) > 0 {
-		m["name_localizations"] = o.nameLoc
+		fields["name_localizations"] = o.nameLoc
 	}
 	if len(o.descLoc) > 0 {
-		m["description_localizations"] = o.descLoc
+		fields["description_localizations"] = o.descLoc
 	}
 	if len(o.choices) > 0 {
-		cs := make([]map[string]any, 0, len(o.choices))
+		choices := make([]map[string]any, 0, len(o.choices))
 		for _, ch := range o.choices {
-			cs = append(cs, ch.build())
+			choices = append(choices, ch.build())
 		}
-		m["choices"] = cs
+		fields["choices"] = choices
 	}
 	if o.minVal != nil {
-		m["min_value"] = *o.minVal
+		fields["min_value"] = *o.minVal
 	}
 	if o.maxVal != nil {
-		m["max_value"] = *o.maxVal
+		fields["max_value"] = *o.maxVal
 	}
 	if o.minLen != nil {
-		m["min_length"] = *o.minLen
+		fields["min_length"] = *o.minLen
 	}
 	if o.maxLen != nil {
-		m["max_length"] = *o.maxLen
+		fields["max_length"] = *o.maxLen
 	}
 	if len(o.channelTypes) > 0 {
-		m["channel_types"] = o.channelTypes
+		fields["channel_types"] = o.channelTypes
 	}
 	if o.autocomplete {
-		m["autocomplete"] = true
+		fields["autocomplete"] = true
 	}
 	if len(o.options) > 0 {
-		m["options"] = buildOptions(o.options)
+		fields["options"] = buildOptions(o.options)
 	}
-	return m
+	return fields
 }
 
 func buildOptions(opts []Option) []map[string]any {
@@ -307,16 +307,16 @@ func (c Choice) Loc(l Locale, name string) Choice {
 }
 
 func (c Choice) build() map[string]any {
-	m := map[string]any{fieldName: c.name, fieldValue: c.value}
+	fields := map[string]any{fieldName: c.name, fieldValue: c.value}
 	if len(c.nameLoc) > 0 {
-		m["name_localizations"] = c.nameLoc
+		fields["name_localizations"] = c.nameLoc
 	}
-	return m
+	return fields
 }
 
-func cloneSet(m map[string]string, key, val string) map[string]string {
-	out := make(map[string]string, len(m)+1)
-	for k, v := range m {
+func cloneSet(source map[string]string, key, val string) map[string]string {
+	out := make(map[string]string, len(source)+1)
+	for k, v := range source {
 		out[k] = v
 	}
 	out[key] = val

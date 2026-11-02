@@ -47,11 +47,11 @@ func (d *defaults) resolveGuild(ctx context.Context, guildID string) (string, er
 	if d.soleGUID != "" {
 		return d.soleGUID, nil
 	}
-	g, err := d.guilds.Sole(ctx)
+	guild, err := d.guilds.Sole(ctx)
 	if err != nil {
 		return "", err
 	}
-	d.soleGUID = g.ID
+	d.soleGUID = guild.ID
 	return d.soleGUID, nil
 }
 
@@ -61,10 +61,10 @@ func (d *defaults) appIDOnce(ctx context.Context) (string, error) {
 	if d.appID != "" {
 		return d.appID, nil
 	}
-	id, err := fetchAppID(ctx, d.rt)
+	appID, err := fetchAppID(ctx, d.rt)
 	if err != nil {
 		return "", err
 	}
-	d.appID = id
-	return id, nil
+	d.appID = appID
+	return appID, nil
 }

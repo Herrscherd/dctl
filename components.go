@@ -23,12 +23,12 @@ type Components struct {
 
 func choiceMenuComponents(customID string, options []SelectOption) []map[string]any {
 	opts := make([]map[string]any, 0, len(options))
-	for _, o := range options {
-		m := map[string]any{"label": clamp(o.Label), fieldValue: clamp(o.Value)}
-		if o.Description != "" {
-			m["description"] = clamp(o.Description)
+	for _, option := range options {
+		fields := map[string]any{"label": clamp(option.Label), fieldValue: clamp(option.Value)}
+		if option.Description != "" {
+			fields["description"] = clamp(option.Description)
 		}
-		opts = append(opts, m)
+		opts = append(opts, fields)
 	}
 	return []map[string]any{{
 		fieldType: 1,
@@ -45,7 +45,7 @@ func choiceMenuComponents(customID string, options []SelectOption) []map[string]
 //
 // It returns [ErrNoChannel] when channelID is empty and no default channel is set.
 func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, content, customID string, options []SelectOption) (*Message, error) {
-	ch, err := c.def.resolveChannel(channelID)
+	channel, err := c.def.resolveChannel(channelID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, con
 		body["message_reference"] = map[string]any{"message_id": replyTo, "fail_if_not_exists": false}
 	}
 	var msg Message
-	if err := c.rt.Do(ctx, http.MethodPost, "/channels/"+seg(ch)+"/messages", body, &msg); err != nil {
+	if err := c.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channel)+"/messages", body, &msg); err != nil {
 		return nil, err
 	}
 	return &msg, nil
@@ -68,22 +68,22 @@ func (c *Components) SendSelectMenu(ctx context.Context, channelID, replyTo, con
 // and the dropdown can't be used twice. Must be sent within Discord's 3s deadline.
 //
 // It fails when Discord rejects the request.
-func (c *Components) Ack(ctx context.Context, id, token, content string) error {
+func (c *Components) Ack(ctx context.Context, interactionID, token, content string) error {
 	body := map[string]any{
 		fieldType: callbackUpdateMessage,
 		fieldData: map[string]any{fieldContent: content, fieldComponents: []any{}},
 	}
-	return c.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback", body, nil)
+	return c.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(interactionID)+"/"+seg(token)+"/callback", body, nil)
 }
 
-func clamp(s string) string {
+func clamp(text string) string {
 	limit := maxOptionText
-	if len(s) <= limit {
-		return s
+	if len(text) <= limit {
+		return text
 	}
-	r := []rune(s)
-	if len(r) <= limit {
-		return s
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
 	}
-	return string(r[:limit])
+	return string(runes[:limit])
 }

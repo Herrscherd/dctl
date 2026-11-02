@@ -58,20 +58,20 @@ func New(token, defaultChannel string, opts ...ClientOption) *Client {
 		topts = append(topts, transport.WithHTTPClient(cfg.httpClient))
 	}
 	rt := transport.NewHTTP(token, topts...)
-	c := newWith(rt, defaultChannel)
-	c.def.guild = cfg.guild
-	c.def.globalCommands = cfg.global
-	return c
+	client := newWith(rt, defaultChannel)
+	client.def.guild = cfg.guild
+	client.def.globalCommands = cfg.global
+	return client
 }
 
-func newWith(rt transport.Doer, defaultChannel string) *Client {
-	guilds := &Guilds{rt: rt}
-	def := &defaults{rt: rt, channel: defaultChannel, guilds: guilds}
+func newWith(doer transport.Doer, defaultChannel string) *Client {
+	guilds := &Guilds{rt: doer}
+	def := &defaults{rt: doer, channel: defaultChannel, guilds: guilds}
 	return &Client{
-		rt:           rt,
+		rt:           doer,
 		def:          def,
 		guilds:       guilds,
-		interactions: &Interactions{rt: rt, def: def},
+		interactions: &Interactions{rt: doer, def: def},
 	}
 }
 

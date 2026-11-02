@@ -16,12 +16,12 @@ type Threads struct {
 // Start opens a public thread off messageID in channelID.
 // auto_archive_duration is set to 1440 minutes (24 h).
 func (t *Threads) Start(ctx context.Context, channelID, messageID, name string) (*Channel, error) {
-	var ch Channel
+	var channel Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/messages/"+seg(messageID)+"/threads",
-		map[string]any{fieldName: name, "auto_archive_duration": autoArchive}, &ch); err != nil {
+		map[string]any{fieldName: name, "auto_archive_duration": autoArchive}, &channel); err != nil {
 		return nil, err
 	}
-	return &ch, nil
+	return &channel, nil
 }
 
 // StartPrivate opens a private thread in channelID, with no parent message so
@@ -29,17 +29,17 @@ func (t *Threads) Start(ctx context.Context, channelID, messageID, name string) 
 // MANAGE_THREADS can see it. Invitable is false, so members cannot pull others
 // in. The creating bot is a member; add the humans with AddMember.
 func (t *Threads) StartPrivate(ctx context.Context, channelID, name string) (*Channel, error) {
-	var ch Channel
+	var channel Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/threads",
 		map[string]any{
 			fieldName:               name,
 			fieldType:               ChannelPrivateThread,
 			"invitable":             false,
 			"auto_archive_duration": autoArchive,
-		}, &ch); err != nil {
+		}, &channel); err != nil {
 		return nil, err
 	}
-	return &ch, nil
+	return &channel, nil
 }
 
 // AddMember gives userID access to threadID. A private thread is invisible until
@@ -57,22 +57,22 @@ func (t *Threads) CreateForum(ctx context.Context, guildID, name string) (*Chann
 	if err != nil {
 		return nil, err
 	}
-	var ch Channel
+	var channel Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/guilds/"+seg(gid)+"/channels",
-		map[string]any{fieldName: name, fieldType: ChannelForum}, &ch); err != nil {
+		map[string]any{fieldName: name, fieldType: ChannelForum}, &channel); err != nil {
 		return nil, err
 	}
-	return &ch, nil
+	return &channel, nil
 }
 
 // ForumPost creates a thread (post) in forum forumID with an initial message.
 func (t *Threads) ForumPost(ctx context.Context, forumID, name, content string) (*Channel, error) {
-	var ch Channel
+	var channel Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/channels/"+seg(forumID)+"/threads",
-		map[string]any{fieldName: name, "message": map[string]any{fieldContent: content}}, &ch); err != nil {
+		map[string]any{fieldName: name, "message": map[string]any{fieldContent: content}}, &channel); err != nil {
 		return nil, err
 	}
-	return &ch, nil
+	return &channel, nil
 }
 
 const autoArchive = 1440

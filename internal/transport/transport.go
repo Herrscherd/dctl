@@ -60,20 +60,20 @@ func WithHTTPClient(c *http.Client) Option { return func(h *HTTP) { h.client = c
 
 // NewHTTP builds the real transport. An empty token makes every Do return ErrDisabled.
 func NewHTTP(token string, opts ...Option) *HTTP {
-	h := &HTTP{token: token, base: DefaultBase, client: &http.Client{Timeout: defaultTimeout}}
+	httpTransport := &HTTP{token: token, base: DefaultBase, client: &http.Client{Timeout: defaultTimeout}}
 	for _, o := range opts {
-		o(h)
+		o(httpTransport)
 	}
-	return h
+	return httpTransport
 }
 
 // Enabled reports whether a token is configured.
 func (h *HTTP) Enabled() bool { return h != nil && h.token != "" }
 
 func scrubURLError(method string, err error) error {
-	var ue *url.Error
-	if errors.As(err, &ue) {
-		return fmt.Errorf("dctl: %s request failed: %w", method, ue.Err)
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Errorf("dctl: %s request failed: %w", method, urlErr.Err)
 	}
 	return err
 }
@@ -143,13 +143,13 @@ func decodeResponse(status int, respBody []byte, out any) error {
 }
 
 func retryAfter(body []byte) (time.Duration, bool) {
-	var v struct {
+	var rateLimit struct {
 		RetryAfter float64 `json:"retry_after"`
 	}
-	if err := json.Unmarshal(body, &v); err != nil || v.RetryAfter <= 0 {
+	if err := json.Unmarshal(body, &rateLimit); err != nil || rateLimit.RetryAfter <= 0 {
 		return 0, false
 	}
-	return time.Duration(v.RetryAfter*float64(time.Second)) + 250*time.Millisecond, true
+	return time.Duration(rateLimit.RetryAfter*float64(time.Second)) + 250*time.Millisecond, true
 }
 
 type response struct {
