@@ -19,6 +19,11 @@ import (
 // DefaultBase is the Discord REST API root.
 const DefaultBase = "https://discord.com/api/v10"
 
+const (
+	defaultTimeout   = 15 * time.Second
+	maxResponseBytes = 1 << 20
+)
+
 // ErrDisabled is returned by Do when no bot token is configured.
 var ErrDisabled = errors.New("dctl: no bot token (DISCORD_BOT_TOKEN)")
 
@@ -55,7 +60,7 @@ func WithHTTPClient(c *http.Client) Option { return func(h *HTTP) { h.client = c
 
 // NewHTTP builds the real transport. An empty token makes every Do return ErrDisabled.
 func NewHTTP(token string, opts ...Option) *HTTP {
-	h := &HTTP{token: token, base: DefaultBase, client: &http.Client{Timeout: 15 * time.Second}}
+	h := &HTTP{token: token, base: DefaultBase, client: &http.Client{Timeout: defaultTimeout}}
 	for _, o := range opts {
 		o(h)
 	}
@@ -81,37 +86,57 @@ func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error
 	if !h.Enabled() {
 		return ErrDisabled
 	}
-	var buf []byte
-	if body != nil {
-		var err error
-		if buf, err = json.Marshal(body); err != nil {
-			return err
-		}
+	buf, err := marshalBody(body)
+	if err != nil {
+		return err
 	}
 	for attempt := 0; ; attempt++ {
 		respBody, status, err := h.attempt(ctx, method, path, buf, body != nil)
 		if err != nil {
 			return err
 		}
-		if status == http.StatusTooManyRequests && attempt < rateLimitRetries {
-			wait, ok := retryAfter(respBody)
-			if ok && wait <= maxRateLimitWait {
-				select {
-				case <-time.After(wait):
-					continue
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
+		wait, retry := retryDelay(status, attempt, respBody)
+		if !retry {
+			return decodeResponse(status, respBody, out)
 		}
-		if status < 200 || status >= 300 {
-			return &APIError{Status: status, Body: strings.TrimSpace(string(respBody))}
+		if err := waitFor(ctx, wait); err != nil {
+			return err
 		}
-		if out == nil || len(respBody) == 0 {
-			return nil
-		}
-		return json.Unmarshal(respBody, out)
 	}
+}
+
+func retryDelay(status, attempt int, respBody []byte) (time.Duration, bool) {
+	if status != http.StatusTooManyRequests || attempt >= rateLimitRetries {
+		return 0, false
+	}
+	wait, ok := retryAfter(respBody)
+	return wait, ok && wait <= maxRateLimitWait
+}
+
+func marshalBody(body any) ([]byte, error) {
+	if body == nil {
+		return nil, nil
+	}
+	return json.Marshal(body)
+}
+
+func waitFor(ctx context.Context, wait time.Duration) error {
+	select {
+	case <-time.After(wait):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func decodeResponse(status int, respBody []byte, out any) error {
+	if status < 200 || status >= 300 {
+		return &APIError{Status: status, Body: strings.TrimSpace(string(respBody))}
+	}
+	if out == nil || len(respBody) == 0 {
+		return nil
+	}
+	return json.Unmarshal(respBody, out)
 }
 
 func retryAfter(body []byte) (time.Duration, bool) {
@@ -142,7 +167,7 @@ func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, has
 	if err != nil {
 		return nil, 0, scrubURLError(method, err)
 	}
-	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	closeErr := resp.Body.Close()
 	if err := errors.Join(readErr, closeErr); err != nil {
 		return nil, 0, fmt.Errorf("reading response: %w", err)

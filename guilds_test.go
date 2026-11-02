@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -17,7 +18,7 @@ func TestGuildsList(t *testing.T) {
 	if len(gs) != 1 || gs[0].ID != "g1" {
 		t.Fatalf("guilds = %+v", gs)
 	}
-	if c := s.Last(); c.Method != "GET" || c.Path != "/users/@me/guilds" {
+	if c := s.Last(); c.Method != http.MethodGet || c.Path != "/users/@me/guilds" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }

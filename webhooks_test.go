@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -18,7 +19,7 @@ func TestWebhooksCreate(t *testing.T) {
 		t.Fatalf("hook = %+v", hook)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/channels/c1/webhooks" {
+	if c.Method != http.MethodPost || c.Path != "/channels/c1/webhooks" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -34,7 +35,7 @@ func TestWebhooksList(t *testing.T) {
 		t.Fatalf("hooks = %+v", hooks)
 	}
 	c := s.Last()
-	if c.Method != "GET" || c.Path != "/channels/c1/webhooks" {
+	if c.Method != http.MethodGet || c.Path != "/channels/c1/webhooks" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -45,7 +46,7 @@ func TestWebhooksDelete(t *testing.T) {
 	if err := w.Delete(context.Background(), "w1"); err != nil {
 		t.Fatal(err)
 	}
-	if c := s.Last(); c.Method != "DELETE" || c.Path != "/webhooks/w1" {
+	if c := s.Last(); c.Method != http.MethodDelete || c.Path != "/webhooks/w1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -57,7 +58,7 @@ func TestWebhooksExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/webhooks/w1/tok" {
+	if c.Method != http.MethodPost || c.Path != "/webhooks/w1/tok" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 	if asType[map[string]any](t, c.Body)["content"] != "hello" {

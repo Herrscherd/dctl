@@ -19,13 +19,13 @@ type Messages struct {
 
 // Send posts content to channelID (or the default channel when empty).
 func (m *Messages) Send(ctx context.Context, channelID, content string) (*Message, error) {
-	return m.post(ctx, channelID, map[string]any{"content": content})
+	return m.post(ctx, channelID, map[string]any{fieldContent: content})
 }
 
 // Reply posts content as a reply to messageID in channelID (or the default channel).
 func (m *Messages) Reply(ctx context.Context, channelID, messageID, content string) (*Message, error) {
 	return m.post(ctx, channelID, map[string]any{
-		"content":           content,
+		fieldContent:        content,
 		"message_reference": map[string]any{"message_id": messageID, "fail_if_not_exists": false},
 	})
 }
@@ -91,7 +91,7 @@ func (m *Messages) Edit(ctx context.Context, channelID, messageID, content strin
 	}
 	var msg Message
 	if err := m.rt.Do(ctx, http.MethodPatch, "/channels/"+seg(ch)+"/messages/"+seg(messageID),
-		map[string]any{"content": content}, &msg); err != nil {
+		map[string]any{fieldContent: content}, &msg); err != nil {
 		return nil, err
 	}
 	return &msg, nil

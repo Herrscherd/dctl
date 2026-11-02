@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -43,7 +44,7 @@ func TestThreadsStartPrivate(t *testing.T) {
 		t.Fatalf("thread = %+v", ch)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/channels/c1/threads" {
+	if c.Method != http.MethodPost || c.Path != "/channels/c1/threads" {
 		t.Fatalf("call = %s %s", c.Method, c.Path)
 	}
 	body := asType[map[string]any](t, c.Body)
@@ -64,7 +65,7 @@ func TestThreadsAddMember(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "PUT" || c.Path != "/channels/t9/thread-members/u1" {
+	if c.Method != http.MethodPut || c.Path != "/channels/t9/thread-members/u1" {
 		t.Fatalf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -81,7 +82,7 @@ func TestThreadsCreateForum(t *testing.T) {
 		t.Fatalf("channel = %+v", ch)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/guilds/g1/channels" {
+	if c.Method != http.MethodPost || c.Path != "/guilds/g1/channels" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 	body := asType[map[string]any](t, c.Body)

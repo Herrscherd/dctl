@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -37,7 +38,7 @@ func TestRolesCreate(t *testing.T) {
 		t.Fatalf("role = %+v", r)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/guilds/g1/roles" {
+	if c.Method != http.MethodPost || c.Path != "/guilds/g1/roles" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -47,7 +48,7 @@ func TestRolesDelete(t *testing.T) {
 	if err := roles(s).Delete(context.Background(), "g1", "r2"); err != nil {
 		t.Fatal(err)
 	}
-	if c := s.Last(); c.Method != "DELETE" || c.Path != "/guilds/g1/roles/r2" {
+	if c := s.Last(); c.Method != http.MethodDelete || c.Path != "/guilds/g1/roles/r2" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -62,7 +63,7 @@ func TestRolesUpdate(t *testing.T) {
 		t.Fatalf("role = %+v", r)
 	}
 	c := s.Last()
-	if c.Method != "PATCH" || c.Path != "/guilds/g1/roles/r2" {
+	if c.Method != http.MethodPatch || c.Path != "/guilds/g1/roles/r2" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -73,7 +74,7 @@ func TestRolesUnassign(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "DELETE" || c.Path != "/guilds/g1/members/u1/roles/r2" {
+	if c.Method != http.MethodDelete || c.Path != "/guilds/g1/members/u1/roles/r2" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -84,7 +85,7 @@ func TestRolesAssignToMember(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "PUT" || c.Path != "/guilds/g1/members/u1/roles/r2" {
+	if c.Method != http.MethodPut || c.Path != "/guilds/g1/members/u1/roles/r2" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }

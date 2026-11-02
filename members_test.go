@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -35,7 +36,7 @@ func TestMembersList(t *testing.T) {
 		t.Fatalf("members = %+v", ms)
 	}
 	c := s.Last()
-	if c.Method != "GET" || c.Path != "/guilds/g1/members?limit=100" {
+	if c.Method != http.MethodGet || c.Path != "/guilds/g1/members?limit=100" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -46,7 +47,7 @@ func TestMembersKick(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "DELETE" || c.Path != "/guilds/g1/members/u1" {
+	if c.Method != http.MethodDelete || c.Path != "/guilds/g1/members/u1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -57,7 +58,7 @@ func TestMembersBan(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "PUT" || c.Path != "/guilds/g1/bans/u1" {
+	if c.Method != http.MethodPut || c.Path != "/guilds/g1/bans/u1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }

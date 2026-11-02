@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -15,7 +16,7 @@ func TestPermissionsSetOverwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "PUT" || c.Path != "/channels/c1/permissions/r1" {
+	if c.Method != http.MethodPut || c.Path != "/channels/c1/permissions/r1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 	body := asType[map[string]any](t, c.Body)
@@ -31,7 +32,7 @@ func TestPermissionsRemoveOverwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "DELETE" || c.Path != "/channels/c1/permissions/r1" {
+	if c.Method != http.MethodDelete || c.Path != "/channels/c1/permissions/r1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }

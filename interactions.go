@@ -155,7 +155,7 @@ func findValue(opts []InteractionOption, name string) (any, bool) {
 
 // Focused returns the name and current (partial) string value of the option the
 // user is typing in an autocomplete interaction, searching nested subcommands.
-func (d InteractionData) Focused() (name, value string, ok bool) {
+func (d InteractionData) Focused() (string, string, bool) {
 	return findFocused(d.Options)
 }
 
@@ -308,12 +308,12 @@ func (in *Interactions) Registry() *Registry {
 
 // Respond sends a CHANNEL_MESSAGE_WITH_SOURCE (type 4) reply.
 func (in *Interactions) Respond(ctx context.Context, id, token string, r Response) error {
-	data := map[string]any{"content": r.Content}
+	data := map[string]any{fieldContent: r.Content}
 	if r.Ephemeral {
-		data["flags"] = 1 << 6
+		data["flags"] = flagEphemeral
 	}
 	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback",
-		map[string]any{"type": 4, "data": data}, nil)
+		map[string]any{fieldType: callbackChannelMessage, fieldData: data}, nil)
 }
 
 // Defer acknowledges an interaction with a DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
@@ -321,25 +321,25 @@ func (in *Interactions) Respond(ctx context.Context, id, token string, r Respons
 func (in *Interactions) Defer(ctx context.Context, id, token string, ephemeral bool) error {
 	data := map[string]any{}
 	if ephemeral {
-		data["flags"] = 1 << 6
+		data["flags"] = flagEphemeral
 	}
 	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback",
-		map[string]any{"type": 5, "data": data}, nil)
+		map[string]any{fieldType: callbackDeferredMessage, fieldData: data}, nil)
 }
 
 // RespondAutocomplete sends an APPLICATION_COMMAND_AUTOCOMPLETE_RESULT (type 8)
 // reply carrying the suggestion list. Discord accepts at most 25 choices; extras
 // are dropped here so callers need not pre-trim.
 func (in *Interactions) RespondAutocomplete(ctx context.Context, id, token string, choices []AutocompleteChoice) error {
-	if len(choices) > 25 {
-		choices = choices[:25]
+	if len(choices) > maxAutocompleteChoices {
+		choices = choices[:maxAutocompleteChoices]
 	}
 	cs := make([]map[string]any, 0, len(choices))
 	for _, ch := range choices {
-		cs = append(cs, map[string]any{"name": ch.Name, "value": ch.Value})
+		cs = append(cs, map[string]any{fieldName: ch.Name, fieldValue: ch.Value})
 	}
 	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback",
-		map[string]any{"type": 8, "data": map[string]any{"choices": cs}}, nil)
+		map[string]any{fieldType: callbackAutocompleteResult, fieldData: map[string]any{"choices": cs}}, nil)
 }
 
 // EditResponse fills in the deferred reply by editing the original interaction
@@ -347,7 +347,7 @@ func (in *Interactions) RespondAutocomplete(ctx context.Context, id, token strin
 // AppID); the interaction token authorizes the edit for ~15 minutes.
 func (in *Interactions) EditResponse(ctx context.Context, appID, token string, r Response) error {
 	return in.rt.Do(ctx, http.MethodPatch, "/webhooks/"+seg(appID)+"/"+seg(token)+"/messages/@original",
-		map[string]any{"content": r.Content}, nil)
+		map[string]any{fieldContent: r.Content}, nil)
 }
 
 // UpsertStatusMessage edits the existing status message or sends a new one,

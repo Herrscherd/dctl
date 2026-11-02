@@ -111,7 +111,7 @@ func (c *Command) With(opts ...Option) *Command {
 func (c *Command) JSON() map[string]any { return c.build() }
 
 func (c *Command) build() map[string]any {
-	m := map[string]any{"name": c.name, "type": c.typ}
+	m := map[string]any{fieldName: c.name, fieldType: c.typ}
 	if c.typ == cmdChatInput {
 		m["description"] = c.desc
 		if len(c.descLoc) > 0 {
@@ -213,7 +213,7 @@ func (o Option) ChannelTypes(types ...int) Option { o.channelTypes = types; retu
 func (o Option) Autocomplete() Option { o.autocomplete = true; return o }
 
 func (o Option) build() map[string]any {
-	m := map[string]any{"type": o.typ, "name": o.name, "description": o.desc}
+	m := map[string]any{fieldType: o.typ, fieldName: o.name, "description": o.desc}
 	if o.required {
 		m["required"] = true
 	}
@@ -280,7 +280,7 @@ func (c Choice) Loc(l Locale, name string) Choice {
 }
 
 func (c Choice) build() map[string]any {
-	m := map[string]any{"name": c.name, "value": c.value}
+	m := map[string]any{fieldName: c.name, fieldValue: c.value}
 	if len(c.nameLoc) > 0 {
 		m["name_localizations"] = c.nameLoc
 	}

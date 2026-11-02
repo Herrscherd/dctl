@@ -60,7 +60,7 @@ func TestAppIDCached(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"app1"}`).Reply(`{"id":"app1"}`)
 	c := newWith(s, "chan")
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if id, err := c.Interactions().AppID(context.Background()); err != nil || id != "app1" {
 			t.Fatalf("AppID = %q, %v", id, err)
 		}

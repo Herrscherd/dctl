@@ -3,6 +3,7 @@ package dctl
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -32,7 +33,7 @@ func TestRegistrySyncReconciles(t *testing.T) {
 
 	var methods []string
 	for _, c := range s.Calls() {
-		if c.Method == "PATCH" || c.Method == "POST" || c.Method == "DELETE" {
+		if c.Method == http.MethodPatch || c.Method == http.MethodPost || c.Method == http.MethodDelete {
 			methods = append(methods, c.Method+" "+lastSeg(c.Path))
 		}
 	}
@@ -109,7 +110,7 @@ func TestSyncRefusesToWipeOnEmptyRegistry(t *testing.T) {
 		t.Fatal("Sync on an empty registry with live commands must error, not delete all")
 	}
 	for _, c := range s.Calls() {
-		if c.Method == "DELETE" {
+		if c.Method == http.MethodDelete {
 			t.Fatalf("Sync must not delete on empty registry: %s %s", c.Method, c.Path)
 		}
 	}

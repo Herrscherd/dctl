@@ -34,7 +34,7 @@ func (r *Roles) Create(ctx context.Context, guildID, name string) (*Role, error)
 	}
 	var role Role
 	if err := r.rt.Do(ctx, http.MethodPost, "/guilds/"+seg(gid)+"/roles",
-		map[string]any{"name": name}, &role); err != nil {
+		map[string]any{fieldName: name}, &role); err != nil {
 		return nil, err
 	}
 	return &role, nil

@@ -56,7 +56,7 @@ func (c *Channels) Type(ctx context.Context, channelID string) (int, error) {
 
 // Create creates a text channel named name in guildID (or the sole guild).
 func (c *Channels) Create(ctx context.Context, guildID, name string) (*Channel, error) {
-	return c.create(ctx, guildID, map[string]any{"name": name, "type": ChannelText})
+	return c.create(ctx, guildID, map[string]any{fieldName: name, fieldType: ChannelText})
 }
 
 // CreateUnder creates a text channel nested under category parentID, in that
@@ -66,7 +66,7 @@ func (c *Channels) CreateUnder(ctx context.Context, parentID, name string) (*Cha
 	if err != nil {
 		return nil, err
 	}
-	return c.create(ctx, gid, map[string]any{"name": name, "type": ChannelText, "parent_id": parentID})
+	return c.create(ctx, gid, map[string]any{fieldName: name, fieldType: ChannelText, "parent_id": parentID})
 }
 
 func (c *Channels) guildOf(ctx context.Context, channelID string) (string, error) {
@@ -93,7 +93,7 @@ func (c *Channels) create(ctx context.Context, guildID string, body map[string]a
 }
 
 func (c *Channels) Rename(ctx context.Context, channelID, name string) (*Channel, error) {
-	return c.Update(ctx, channelID, map[string]any{"name": name})
+	return c.Update(ctx, channelID, map[string]any{fieldName: name})
 }
 
 // Update PATCHes arbitrary channel fields (name, parent_id, topic, position…).
@@ -144,7 +144,7 @@ func (c *Channels) EnsureUnder(ctx context.Context, parentID, name string) (*Cha
 			return &chs[i], nil
 		}
 	}
-	return c.create(ctx, gid, map[string]any{"name": name, "type": ChannelText, "parent_id": parentID})
+	return c.create(ctx, gid, map[string]any{fieldName: name, fieldType: ChannelText, "parent_id": parentID})
 }
 
 // Archive archives a thread/forum-post, or deletes a plain text channel

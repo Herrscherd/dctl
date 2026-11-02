@@ -18,7 +18,7 @@ type Threads struct {
 func (t *Threads) Start(ctx context.Context, channelID, messageID, name string) (*Channel, error) {
 	var ch Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/messages/"+seg(messageID)+"/threads",
-		map[string]any{"name": name, "auto_archive_duration": autoArchive}, &ch); err != nil {
+		map[string]any{fieldName: name, "auto_archive_duration": autoArchive}, &ch); err != nil {
 		return nil, err
 	}
 	return &ch, nil
@@ -32,8 +32,8 @@ func (t *Threads) StartPrivate(ctx context.Context, channelID, name string) (*Ch
 	var ch Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/channels/"+seg(channelID)+"/threads",
 		map[string]any{
-			"name":                  name,
-			"type":                  ChannelPrivateThread,
+			fieldName:               name,
+			fieldType:               ChannelPrivateThread,
 			"invitable":             false,
 			"auto_archive_duration": autoArchive,
 		}, &ch); err != nil {
@@ -57,7 +57,7 @@ func (t *Threads) CreateForum(ctx context.Context, guildID, name string) (*Chann
 	}
 	var ch Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/guilds/"+seg(gid)+"/channels",
-		map[string]any{"name": name, "type": ChannelForum}, &ch); err != nil {
+		map[string]any{fieldName: name, fieldType: ChannelForum}, &ch); err != nil {
 		return nil, err
 	}
 	return &ch, nil
@@ -67,7 +67,7 @@ func (t *Threads) CreateForum(ctx context.Context, guildID, name string) (*Chann
 func (t *Threads) ForumPost(ctx context.Context, forumID, name, content string) (*Channel, error) {
 	var ch Channel
 	if err := t.rt.Do(ctx, http.MethodPost, "/channels/"+seg(forumID)+"/threads",
-		map[string]any{"name": name, "message": map[string]any{"content": content}}, &ch); err != nil {
+		map[string]any{fieldName: name, "message": map[string]any{fieldContent: content}}, &ch); err != nil {
 		return nil, err
 	}
 	return &ch, nil
