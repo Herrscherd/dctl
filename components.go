@@ -21,8 +21,6 @@ type Components struct {
 	def *defaults
 }
 
-// choiceMenuComponents builds the Discord component tree for a single-select
-// dropdown: one ACTION_ROW (type 1) wrapping one STRING_SELECT (type 3).
 func choiceMenuComponents(customID string, options []SelectOption) []map[string]any {
 	opts := make([]map[string]any, 0, len(options))
 	for _, o := range options {
@@ -74,7 +72,6 @@ func (c *Components) Ack(ctx context.Context, id, token, content string) error {
 	return c.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback", body, nil)
 }
 
-// clamp truncates s to at most limit runes without splitting a multibyte rune.
 func clamp(s string, limit int) string {
 	if len(s) <= limit {
 		return s

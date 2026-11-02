@@ -30,8 +30,6 @@ func TestDefaultsResolveChannelErrorsWhenNone(t *testing.T) {
 	}
 }
 
-// A configured guild must win over the sole-guild lookup: a bot in several
-// servers has no sole guild, and the lookup would fail the call outright.
 func TestResolveGuildPrefersConfiguredGuild(t *testing.T) {
 	s := transport.NewStub().Reply(`[{"id":"g1","name":"a"},{"id":"g2","name":"b"}]`)
 	d := &defaults{guild: "g2", guilds: &Guilds{rt: s}}

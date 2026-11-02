@@ -2,14 +2,12 @@ package dctl
 
 import "strconv"
 
-// Discord application-command types.
 const (
 	cmdChatInput = 1
 	cmdUser      = 2
 	cmdMessage   = 3
 )
 
-// Discord application-command option types.
 const (
 	optSubCommand      = 1
 	optSubCommandGroup = 2

@@ -11,9 +11,9 @@ import (
 
 // Interaction type constants we care about (Discord interaction-type field).
 const (
-	InteractionCommand      = 2 // APPLICATION_COMMAND
-	InteractionComponent    = 3 // MESSAGE_COMPONENT (button/select click)
-	InteractionAutocomplete = 4 // APPLICATION_COMMAND_AUTOCOMPLETE
+	InteractionCommand      = 2
+	InteractionComponent    = 3
+	InteractionAutocomplete = 4
 )
 
 // Interaction is the subset of a Discord INTERACTION_CREATE we handle
@@ -217,9 +217,6 @@ type RegisteredCommand struct {
 	Description string `json:"description"`
 }
 
-// commandsBase is the command collection every command op reads and writes:
-// the application's global commands when the client asked for them
-// (WithGlobalCommands), otherwise the default guild's.
 func (in *Interactions) commandsBase(ctx context.Context) (string, error) {
 	appID, err := in.AppID(ctx)
 	if err != nil {
@@ -354,8 +351,6 @@ func (in *Interactions) EditResponse(ctx context.Context, appID, token string, r
 // UpsertStatusMessage edits the existing status message or sends a new one,
 // returning the live message id.
 func (in *Interactions) UpsertStatusMessage(ctx context.Context, channelID, msgID, content string) (string, error) {
-	// Route through Messages so message path/body construction lives in one place;
-	// only the edit→send 404 fallback is specific to this call.
 	msgs := &Messages{rt: in.rt, def: in.def}
 	if msgID != "" {
 		if _, err := msgs.Edit(ctx, channelID, msgID, content); err == nil {

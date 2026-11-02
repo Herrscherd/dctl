@@ -13,7 +13,7 @@ func roles(s *transport.Stub) *Roles {
 
 func TestRolesList(t *testing.T) {
 	s := transport.NewStub().
-		Reply(`[{"id":"g1"}]`). // resolveGuild
+		Reply(`[{"id":"g1"}]`).
 		Reply(`[{"id":"r1","name":"mod"}]`)
 	rs, err := roles(s).List(context.Background(), "")
 	if err != nil {

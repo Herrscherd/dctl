@@ -13,8 +13,6 @@ func newReg(s *transport.Stub) *Registry {
 	return in.Registry()
 }
 
-// stubGuild queues the @me and guild-list replies commandsBase needs. App id and
-// sole guild are cached after the first resolve, so this is needed once per client.
 func stubGuild(s *transport.Stub) {
 	s.Reply(`{"id":"app1"}`).Reply(`[{"id":"g1"}]`)
 }
@@ -22,10 +20,9 @@ func stubGuild(s *transport.Stub) {
 func TestRegistrySyncReconciles(t *testing.T) {
 	s := transport.NewStub()
 	reg := newReg(s)
-	reg.Add(NewCommand("keep", "kept"), nil) // exists → Edit
-	reg.Add(NewCommand("new", "fresh"), nil) // missing → Create
+	reg.Add(NewCommand("keep", "kept"), nil)
+	reg.Add(NewCommand("new", "fresh"), nil)
 
-	// Sync resolves the base (app id + guild) once, then lists existing commands.
 	stubGuild(s)
 	s.Reply(`[{"id":"c1","name":"keep"},{"id":"c2","name":"stale"}]`)
 

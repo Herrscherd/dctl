@@ -86,8 +86,6 @@ type desiredCmd struct {
 	body map[string]any
 }
 
-// snapshot builds every desired command's wire body under the lock, so the
-// reconcile loop never reads a command being mutated concurrently.
 func (r *Registry) snapshot() []desiredCmd {
 	r.mu.Lock()
 	defer r.mu.Unlock()

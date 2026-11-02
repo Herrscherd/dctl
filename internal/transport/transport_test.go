@@ -66,24 +66,16 @@ func TestHTTPDoSurfacesAPIError(t *testing.T) {
 	}
 }
 
-// A transport-layer failure (here: connection refused) must not echo the request
-// URL, whose path carries secret tokens (webhook/interaction tokens) into any log
-// the caller writes. net/http returns a *url.Error whose Error() embeds the full
-// URL; Do must scrub it.
 func TestHTTPDoTransportErrorDoesNotLeakToken(t *testing.T) {
 	const secret = "SUPERSECRETWEBHOOKTOKEN"
-	// 127.0.0.1:1 refuses connections, forcing client.Do to fail.
 	rt := NewHTTP("bottok", WithBase("http://127.0.0.1:1"))
 	err := rt.Do(context.Background(), http.MethodPost, "/webhooks/123/"+secret, nil, nil)
 	if err == nil {
 		t.Fatal("want transport error")
 	}
-	// The secret token (a path segment) must never survive into the error string.
-	// The destination host may remain (it is the public API base, not a secret).
 	if strings.Contains(err.Error(), secret) {
 		t.Fatalf("error leaks token: %q", err.Error())
 	}
-	// Cause is preserved for errors.Is against context/network errors.
 	if !strings.Contains(err.Error(), "POST") {
 		t.Fatalf("error dropped method context: %q", err.Error())
 	}
@@ -105,9 +97,6 @@ func TestHTTPDoMarshalsBody(t *testing.T) {
 	}
 }
 
-// Discord's buckets are small — five writes per four seconds on some routes — so
-// a caller doing a handful of calls in a row hits one while doing its job. The
-// answer says how long to wait, and waiting it out is the whole fix.
 func TestHTTPDoWaitsOutARateLimit(t *testing.T) {
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -132,8 +121,6 @@ func TestHTTPDoWaitsOutARateLimit(t *testing.T) {
 	}
 }
 
-// A body is consumable, so replaying a write means rebuilding it. Sending the
-// second attempt with an empty body would be worse than not retrying at all.
 func TestARetriedWriteCarriesItsBodyAgain(t *testing.T) {
 	var bodies []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -157,8 +144,6 @@ func TestARetriedWriteCarriesItsBodyAgain(t *testing.T) {
 	}
 }
 
-// Past a point the answer is not a bucket refilling in a moment but a quota, and
-// blocking on it would hide that from the caller.
 func TestALongRateLimitIsReportedRatherThanWaitedOut(t *testing.T) {
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -178,8 +163,6 @@ func TestALongRateLimitIsReportedRatherThanWaitedOut(t *testing.T) {
 	}
 }
 
-// A route that stays limited must not retry forever: the caller is waiting on a
-// call that is never going to land.
 func TestARateLimitThatNeverClearsGivesUp(t *testing.T) {
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +180,6 @@ func TestARateLimitThatNeverClearsGivesUp(t *testing.T) {
 	}
 }
 
-// A cancelled context must not be held by a request sitting out a wait.
 func TestAWaitingRequestStopsWithItsContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

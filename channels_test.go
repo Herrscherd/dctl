@@ -46,8 +46,6 @@ func TestChannelsRename(t *testing.T) {
 }
 
 func TestChannelsEnsureUnderReuses(t *testing.T) {
-	// The parent category names its own guild, then the channel listing holds a
-	// match under p1.
 	s := transport.NewStub().
 		Reply(`{"id":"p1","guild_id":"g1"}`).
 		Reply(`[{"id":"c9","name":"Notes","type":0,"parent_id":"p1"}]`)
@@ -64,9 +62,6 @@ func TestChannelsEnsureUnderReuses(t *testing.T) {
 }
 
 func TestChannelsEnsureUnderCreates(t *testing.T) {
-	// No match under p1 (the existing channel sits under a different parent), so
-	// it creates one nested under p1 — in the guild the parent already named, with
-	// no second lookup of it.
 	s := transport.NewStub().
 		Reply(`{"id":"p1","guild_id":"g1"}`).
 		Reply(`[{"id":"c9","name":"notes","type":0,"parent_id":"other"}]`).
@@ -90,8 +85,6 @@ func TestChannelsEnsureUnderCreates(t *testing.T) {
 	}
 }
 
-// A bot in several servers has no sole guild: nesting under a category must
-// resolve the server from that category, never from the bot's membership list.
 func TestChannelsUnderNeverAsksForTheSoleGuild(t *testing.T) {
 	s := transport.NewStub().
 		Reply(`{"id":"p1","guild_id":"g2"}`).

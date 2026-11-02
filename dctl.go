@@ -31,14 +31,14 @@ func WithHTTPClient(h *http.Client) ClientOption {
 
 // WithGuild pins the guild that guild-scoped ops target when no explicit id is
 // passed. Without it they fall back to Guilds().Sole, which errors when the bot
-// is in more than one server — a bot invited to a second guild would otherwise
+// is in more than one server. A bot invited to a second guild would otherwise
 // lose command registration entirely.
 func WithGuild(id string) ClientOption {
 	return func(c *clientConfig) { c.guild = id }
 }
 
 // WithGlobalCommands registers slash commands on the application rather than on
-// one guild, so every server the bot is in gets them — the only scope that
+// one guild, so every server the bot is in gets them. It is the only scope that
 // works for a bot meant to be installed anywhere. Guild commands appear
 // instantly and global ones take up to an hour to propagate, which is why they
 // stay the default. Other guild-scoped ops are unaffected.
@@ -64,7 +64,6 @@ func New(token, defaultChannel string, opts ...ClientOption) *Client {
 	return c
 }
 
-// newWith wires a Client around an arbitrary Doer (used by tests with a stub).
 func newWith(rt transport.Doer, defaultChannel string) *Client {
 	guilds := &Guilds{rt: rt}
 	def := &defaults{rt: rt, channel: defaultChannel, guilds: guilds}

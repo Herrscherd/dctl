@@ -75,9 +75,6 @@ func TestMessagesGetUsesTheDefaultChannel(t *testing.T) {
 	}
 }
 
-// A webhook-driven channel carries its content in embeds, not in `content`. A
-// message decoded without them reads as empty, which is how a bot's report
-// becomes invisible to anything reading the channel.
 func TestMessageDecodesEmbeds(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"m1","content":"","embeds":[{
 		"title":"Quest failed","description":"stack trace here","url":"https://example.test/run/1",
@@ -109,8 +106,6 @@ func TestMessageDecodesEmbeds(t *testing.T) {
 	}
 }
 
-// An embed with no image must decode to a nil pointer rather than an empty
-// struct, so a reader can tell "no picture" from "a picture at the empty url".
 func TestEmbedWithoutImageDecodesNil(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"m1","embeds":[{"title":"no picture"}]}`)
 	got, err := msgs(s, "def").Get(context.Background(), "c", "m1")

@@ -1,5 +1,5 @@
 // Package transport is dctl's HTTP boundary to the Discord REST API (v10):
-// auth, request building, error decoding. It is the single mockable seam —
+// auth, request building, error decoding. It is the single mockable seam:
 // resource clients depend on Doer, never on net/http directly.
 package transport
 
@@ -65,12 +65,6 @@ func NewHTTP(token string, opts ...Option) *HTTP {
 // Enabled reports whether a token is configured.
 func (h *HTTP) Enabled() bool { return h != nil && h.token != "" }
 
-// scrubURLError strips the request URL from a transport error. net/http returns a
-// *url.Error whose Error() embeds the full URL, and several Discord paths carry
-// secret tokens (webhook/interaction tokens) as path segments — echoing that URL
-// into a caller's log would leak them. We keep only the method and the wrapped
-// cause (dial/timeout/context error), which is token-free and preserves errors.Is
-// against context.DeadlineExceeded / context.Canceled.
 func scrubURLError(method string, err error) error {
 	var ue *url.Error
 	if errors.As(err, &ue) {
@@ -79,17 +73,8 @@ func scrubURLError(method string, err error) error {
 	return err
 }
 
-// rateLimitRetries is how many times a request waits out a 429 before giving
-// up. Discord's buckets are small — five writes per four seconds on some routes
-// — so a caller doing a handful of calls in a row will hit one in the ordinary
-// course of doing its job, and the answer says exactly how long to wait. Without
-// this, the caller sees a failure it can only paper over by retrying the whole
-// operation, which walks into the same wall.
 const rateLimitRetries = 4
 
-// maxRateLimitWait caps how long one request will sit waiting. Past it, the
-// answer is not a bucket refilling in a moment but a daily quota or something
-// the operator has to look at, and blocking on it would hide that.
 const maxRateLimitWait = 30 * time.Second
 
 func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error {
@@ -129,9 +114,6 @@ func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error
 	}
 }
 
-// retryAfter reads how long Discord asked us to wait. A 429 body carries it in
-// seconds, fractional. An unreadable body reports false rather than guessing: a
-// wait invented here would either hammer the route or stall the caller.
 func retryAfter(body []byte) (time.Duration, bool) {
 	var v struct {
 		RetryAfter float64 `json:"retry_after"`
@@ -139,13 +121,9 @@ func retryAfter(body []byte) (time.Duration, bool) {
 	if err := json.Unmarshal(body, &v); err != nil || v.RetryAfter <= 0 {
 		return 0, false
 	}
-	// Discord's clock and ours disagree by a little, and coming back a hair early
-	// spends the retry for nothing.
 	return time.Duration(v.RetryAfter*float64(time.Second)) + 250*time.Millisecond, true
 }
 
-// attempt performs one request and hands back the raw response. It separates
-// what is worth retrying (a status) from what is not (a transport failure).
 func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, hasBody bool) ([]byte, int, error) {
 	var rdr io.Reader
 	if hasBody {
