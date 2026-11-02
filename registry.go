@@ -2,7 +2,6 @@ package dctl
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"sync"
 )
@@ -29,16 +28,16 @@ type Registry struct {
 }
 
 // Add binds a command to a handler, replacing any existing binding by name.
-func (r *Registry) Add(cmd *Command, h Handler) *Registry {
+func (r *Registry) Add(cmd *Command, handler Handler) *Registry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	name := cmd.Name()
-	e := r.entries[name]
-	if e.cmd == nil {
+	entry := r.entries[name]
+	if entry.cmd == nil {
 		r.order = append(r.order, name)
 	}
-	e.cmd, e.handler = cmd, h
-	r.entries[name] = e
+	entry.cmd, entry.handler = cmd, handler
+	r.entries[name] = entry
 	return r
 }
 
@@ -46,12 +45,12 @@ func (r *Registry) Add(cmd *Command, h Handler) *Registry {
 func (r *Registry) Update(cmd *Command, h Handler) *Registry { return r.Add(cmd, h) }
 
 // Autocomplete attaches an autocomplete handler to an already-added command.
-func (r *Registry) Autocomplete(name string, h AutocompleteHandler) *Registry {
+func (r *Registry) Autocomplete(name string, handler AutocompleteHandler) *Registry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if e, ok := r.entries[name]; ok {
-		e.autocomplete = h
-		r.entries[name] = e
+	if entry, ok := r.entries[name]; ok {
+		entry.autocomplete = handler
+		r.entries[name] = entry
 	}
 	return r
 }
@@ -61,9 +60,9 @@ func (r *Registry) Remove(name string) *Registry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.entries, name)
-	for i, n := range r.order {
+	for index, n := range r.order {
 		if n == name {
-			r.order = append(r.order[:i], r.order[i+1:]...)
+			r.order = append(r.order[:index], r.order[index+1:]...)
 			break
 		}
 	}
@@ -86,8 +85,6 @@ type desiredCmd struct {
 	body map[string]any
 }
 
-// snapshot builds every desired command's wire body under the lock, so the
-// reconcile loop never reads a command being mutated concurrently.
 func (r *Registry) snapshot() []desiredCmd {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -98,9 +95,11 @@ func (r *Registry) snapshot() []desiredCmd {
 	return out
 }
 
-// Sync reconciles Discord with the registry: it creates new commands, edits
-// existing ones, and deletes those no longer bound. It refuses to run on an
-// empty registry while commands exist, to avoid silently deleting everything.
+// Sync reconciles Discord with the registry. It creates new commands, edits
+// existing ones and deletes those no longer bound.
+//
+// Sync refuses to run on an empty registry while commands exist. It returns a
+// [*SyncWouldDeleteError] in that case, so no command is deleted by accident.
 func (r *Registry) Sync(ctx context.Context) error {
 	base, err := r.in.commandsBase(ctx)
 	if err != nil {
@@ -113,29 +112,19 @@ func (r *Registry) Sync(ctx context.Context) error {
 
 	desired := r.snapshot()
 	if len(desired) == 0 && len(existing) > 0 {
-		return fmt.Errorf("dctl: Sync on empty registry would delete %d command(s); add commands first", len(existing))
+		return &SyncWouldDeleteError{Count: len(existing)}
 	}
 
-	byName := make(map[string]RegisteredCommand, len(existing))
-	for _, c := range existing {
-		byName[c.Name] = c
+	if err := r.upsertCommands(ctx, base, desired, existing); err != nil {
+		return err
 	}
 	keep := make(map[string]bool, len(desired))
 	for _, d := range desired {
 		keep[d.name] = true
-		if cur, ok := byName[d.name]; ok {
-			if err := r.in.rt.Do(ctx, http.MethodPatch, base+"/"+seg(cur.ID), d.body, nil); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := r.in.rt.Do(ctx, http.MethodPost, base, d.body, nil); err != nil {
-			return err
-		}
 	}
-	for _, c := range existing {
-		if !keep[c.Name] {
-			if err := r.in.rt.Do(ctx, http.MethodDelete, base+"/"+seg(c.ID), nil, nil); err != nil {
+	for _, existingCommand := range existing {
+		if !keep[existingCommand.Name] {
+			if err := r.in.rt.Do(ctx, http.MethodDelete, base+"/"+seg(existingCommand.ID), nil, nil); err != nil {
 				return err
 			}
 		}
@@ -143,29 +132,46 @@ func (r *Registry) Sync(ctx context.Context) error {
 	return nil
 }
 
+func (r *Registry) upsertCommands(ctx context.Context, base string, desired []desiredCmd, existing []RegisteredCommand) error {
+	byName := make(map[string]RegisteredCommand, len(existing))
+	for _, c := range existing {
+		byName[c.Name] = c
+	}
+	for _, wantedCommand := range desired {
+		method, path := http.MethodPost, base
+		if cur, ok := byName[wantedCommand.name]; ok {
+			method, path = http.MethodPatch, base+"/"+seg(cur.ID)
+		}
+		if err := r.in.rt.Do(ctx, method, path, wantedCommand.body, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Dispatch routes a command interaction to its handler by command name.
 // Autocomplete interactions must go through DispatchAutocomplete instead.
-func (r *Registry) Dispatch(ctx context.Context, ix Interaction) (Response, error) {
-	if ix.Type == InteractionAutocomplete {
-		return Response{}, fmt.Errorf("dctl: autocomplete interaction for %q; use DispatchAutocomplete", ix.Data.Name)
+func (r *Registry) Dispatch(ctx context.Context, interaction Interaction) (Response, error) {
+	if interaction.Type == InteractionAutocomplete {
+		return Response{}, &AutocompleteInteractionError{Name: interaction.Data.Name}
 	}
 	r.mu.Lock()
-	e, ok := r.entries[ix.Data.Name]
+	entry, ok := r.entries[interaction.Data.Name]
 	r.mu.Unlock()
 	if !ok {
-		return Response{}, fmt.Errorf("dctl: unknown command %q", ix.Data.Name)
+		return Response{}, &UnknownCommandError{Name: interaction.Data.Name}
 	}
-	return e.handler(ctx, ix)
+	return entry.handler(ctx, interaction)
 }
 
 // DispatchAutocomplete routes an autocomplete interaction to its autocomplete
 // handler by command name.
-func (r *Registry) DispatchAutocomplete(ctx context.Context, ix Interaction) ([]AutocompleteChoice, error) {
+func (r *Registry) DispatchAutocomplete(ctx context.Context, interaction Interaction) ([]AutocompleteChoice, error) {
 	r.mu.Lock()
-	e, ok := r.entries[ix.Data.Name]
+	entry, ok := r.entries[interaction.Data.Name]
 	r.mu.Unlock()
-	if !ok || e.autocomplete == nil {
-		return nil, fmt.Errorf("dctl: no autocomplete handler for %q", ix.Data.Name)
+	if !ok || entry.autocomplete == nil {
+		return nil, &NoAutocompleteHandlerError{Name: interaction.Data.Name}
 	}
-	return e.autocomplete(ctx, ix)
+	return entry.autocomplete(ctx, interaction)
 }

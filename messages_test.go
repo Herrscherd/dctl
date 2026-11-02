@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -24,7 +25,7 @@ func TestMessagesSendUsesDefaultChannelAndNoAllowedMentions(t *testing.T) {
 	if c.Path != "/channels/def/messages" {
 		t.Errorf("path = %s", c.Path)
 	}
-	if _, present := c.Body.(map[string]any)["allowed_mentions"]; present {
+	if _, present := asType[map[string]any](t, c.Body)["allowed_mentions"]; present {
 		t.Error("noMentions removed: allowed_mentions must NOT be injected")
 	}
 }
@@ -46,7 +47,7 @@ func TestMessagesEdit(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "PATCH" || c.Path != "/channels/c/messages/m1" {
+	if c.Method != http.MethodPatch || c.Path != "/channels/c/messages/m1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -60,7 +61,7 @@ func TestMessagesGetFetchesOneMessageByID(t *testing.T) {
 	if got.ID != "m1" || got.Content != "look at this" {
 		t.Fatalf("msg = %+v", got)
 	}
-	if c := s.Last(); c.Method != "GET" || c.Path != "/channels/c/messages/m1" {
+	if c := s.Last(); c.Method != http.MethodGet || c.Path != "/channels/c/messages/m1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -75,9 +76,6 @@ func TestMessagesGetUsesTheDefaultChannel(t *testing.T) {
 	}
 }
 
-// A webhook-driven channel carries its content in embeds, not in `content`. A
-// message decoded without them reads as empty, which is how a bot's report
-// becomes invisible to anything reading the channel.
 func TestMessageDecodesEmbeds(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"m1","content":"","embeds":[{
 		"title":"Quest failed","description":"stack trace here","url":"https://example.test/run/1",
@@ -109,8 +107,6 @@ func TestMessageDecodesEmbeds(t *testing.T) {
 	}
 }
 
-// An embed with no image must decode to a nil pointer rather than an empty
-// struct, so a reader can tell "no picture" from "a picture at the empty url".
 func TestEmbedWithoutImageDecodesNil(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"m1","embeds":[{"title":"no picture"}]}`)
 	got, err := msgs(s, "def").Get(context.Background(), "c", "m1")
@@ -127,7 +123,7 @@ func TestMessagesDelete(t *testing.T) {
 	if err := msgs(s, "").Delete(context.Background(), "c", "m1"); err != nil {
 		t.Fatal(err)
 	}
-	if c := s.Last(); c.Method != "DELETE" || c.Path != "/channels/c/messages/m1" {
+	if c := s.Last(); c.Method != http.MethodDelete || c.Path != "/channels/c/messages/m1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
 }

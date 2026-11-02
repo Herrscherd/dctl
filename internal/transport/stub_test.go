@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 )
@@ -20,10 +21,10 @@ func TestStubCapturesAndReplies(t *testing.T) {
 		t.Errorf("id = %q", out.ID)
 	}
 	call := s.Last()
-	if call.Method != "POST" || call.Path != "/channels/1/messages" {
+	if call.Method != http.MethodPost || call.Path != "/channels/1/messages" {
 		t.Errorf("captured %s %s", call.Method, call.Path)
 	}
-	if call.Body.(map[string]any)["content"] != "hi" {
+	if mapBody(t, call.Body)["content"] != "hi" {
 		t.Errorf("body = %v", call.Body)
 	}
 }
@@ -31,7 +32,16 @@ func TestStubCapturesAndReplies(t *testing.T) {
 func TestStubReturnsConfiguredError(t *testing.T) {
 	s := NewStub()
 	s.Fail(context.DeadlineExceeded)
-	if err := s.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != context.DeadlineExceeded {
+	if err := s.Do(context.Background(), http.MethodGet, "/x", nil, nil); !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("err = %v", err)
 	}
+}
+
+func mapBody(tb testing.TB, body any) map[string]any {
+	tb.Helper()
+	m, ok := body.(map[string]any)
+	if !ok {
+		tb.Fatalf("body is %T, want map[string]any", body)
+	}
+	return m
 }

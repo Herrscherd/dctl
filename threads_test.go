@@ -2,6 +2,7 @@ package dctl
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -24,7 +25,7 @@ func TestThreadsStart(t *testing.T) {
 	if c.Path != "/channels/c/messages/m/threads" {
 		t.Errorf("path = %s", c.Path)
 	}
-	body := c.Body.(map[string]any)
+	body := asType[map[string]any](t, c.Body)
 	if body["name"] != "topic" {
 		t.Errorf("name = %v", body["name"])
 	}
@@ -33,8 +34,6 @@ func TestThreadsStart(t *testing.T) {
 	}
 }
 
-// A private thread is created off the CHANNEL, never off a message: a message
-// would be the public trace the thread exists to avoid.
 func TestThreadsStartPrivate(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"t9","name":"job","type":12}`)
 	ch, err := thr(s).StartPrivate(context.Background(), "c1", "job")
@@ -45,14 +44,13 @@ func TestThreadsStartPrivate(t *testing.T) {
 		t.Fatalf("thread = %+v", ch)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/channels/c1/threads" {
+	if c.Method != http.MethodPost || c.Path != "/channels/c1/threads" {
 		t.Fatalf("call = %s %s", c.Method, c.Path)
 	}
-	body := c.Body.(map[string]any)
+	body := asType[map[string]any](t, c.Body)
 	if body["type"] != ChannelPrivateThread {
 		t.Errorf("type = %v, want a private thread", body["type"])
 	}
-	// invitable would let any member drag others in, which defeats the point.
 	if body["invitable"] != false {
 		t.Errorf("invitable = %v, want false", body["invitable"])
 	}
@@ -67,7 +65,7 @@ func TestThreadsAddMember(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := s.Last()
-	if c.Method != "PUT" || c.Path != "/channels/t9/thread-members/u1" {
+	if c.Method != http.MethodPut || c.Path != "/channels/t9/thread-members/u1" {
 		t.Fatalf("call = %s %s", c.Method, c.Path)
 	}
 }
@@ -84,10 +82,10 @@ func TestThreadsCreateForum(t *testing.T) {
 		t.Fatalf("channel = %+v", ch)
 	}
 	c := s.Last()
-	if c.Method != "POST" || c.Path != "/guilds/g1/channels" {
+	if c.Method != http.MethodPost || c.Path != "/guilds/g1/channels" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
-	body := c.Body.(map[string]any)
+	body := asType[map[string]any](t, c.Body)
 	if body["type"] != ChannelForum {
 		t.Errorf("type = %v", body["type"])
 	}
@@ -106,8 +104,8 @@ func TestThreadsForumPost(t *testing.T) {
 	if c.Path != "/channels/f1/threads" {
 		t.Errorf("path = %s", c.Path)
 	}
-	body := c.Body.(map[string]any)
-	msg := body["message"].(map[string]any)
+	body := asType[map[string]any](t, c.Body)
+	msg := asType[map[string]any](t, body["message"])
 	if msg["content"] != "body" {
 		t.Errorf("message.content = %v", msg["content"])
 	}

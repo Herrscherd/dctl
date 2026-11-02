@@ -3,6 +3,7 @@ package dctl
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -13,8 +14,6 @@ func newReg(s *transport.Stub) *Registry {
 	return in.Registry()
 }
 
-// stubGuild queues the @me and guild-list replies commandsBase needs. App id and
-// sole guild are cached after the first resolve, so this is needed once per client.
 func stubGuild(s *transport.Stub) {
 	s.Reply(`{"id":"app1"}`).Reply(`[{"id":"g1"}]`)
 }
@@ -22,10 +21,9 @@ func stubGuild(s *transport.Stub) {
 func TestRegistrySyncReconciles(t *testing.T) {
 	s := transport.NewStub()
 	reg := newReg(s)
-	reg.Add(NewCommand("keep", "kept"), nil) // exists → Edit
-	reg.Add(NewCommand("new", "fresh"), nil) // missing → Create
+	reg.Add(NewCommand("keep", "kept"), nil)
+	reg.Add(NewCommand("new", "fresh"), nil)
 
-	// Sync resolves the base (app id + guild) once, then lists existing commands.
 	stubGuild(s)
 	s.Reply(`[{"id":"c1","name":"keep"},{"id":"c2","name":"stale"}]`)
 
@@ -35,7 +33,7 @@ func TestRegistrySyncReconciles(t *testing.T) {
 
 	var methods []string
 	for _, c := range s.Calls() {
-		if c.Method == "PATCH" || c.Method == "POST" || c.Method == "DELETE" {
+		if c.Method == http.MethodPatch || c.Method == http.MethodPost || c.Method == http.MethodDelete {
 			methods = append(methods, c.Method+" "+lastSeg(c.Path))
 		}
 	}
@@ -48,7 +46,7 @@ func TestRegistrySyncReconciles(t *testing.T) {
 func TestRegistryDispatch(t *testing.T) {
 	reg := newReg(transport.NewStub())
 	called := false
-	reg.Add(NewCommand("ping", "p"), func(ctx context.Context, ix Interaction) (Response, error) {
+	reg.Add(NewCommand("ping", "p"), func(_ context.Context, _ Interaction) (Response, error) {
 		called = true
 		return Response{Content: "pong"}, nil
 	})
@@ -77,7 +75,7 @@ func TestRegistryRemoveAndOrder(t *testing.T) {
 
 func TestDispatchRejectsAutocomplete(t *testing.T) {
 	reg := newReg(transport.NewStub())
-	reg.Add(NewCommand("ping", "p"), func(ctx context.Context, ix Interaction) (Response, error) {
+	reg.Add(NewCommand("ping", "p"), func(_ context.Context, _ Interaction) (Response, error) {
 		t.Fatal("command handler must not run for an autocomplete interaction")
 		return Response{}, nil
 	})
@@ -90,7 +88,7 @@ func TestDispatchRejectsAutocomplete(t *testing.T) {
 func TestDispatchAutocomplete(t *testing.T) {
 	reg := newReg(transport.NewStub())
 	reg.Add(NewCommand("pick", "p"), nil).
-		Autocomplete("pick", func(ctx context.Context, ix Interaction) ([]AutocompleteChoice, error) {
+		Autocomplete("pick", func(_ context.Context, _ Interaction) ([]AutocompleteChoice, error) {
 			return []AutocompleteChoice{{Name: "a", Value: "a"}}, nil
 		})
 	ix := Interaction{Type: InteractionAutocomplete, Data: InteractionData{Name: "pick"}}
@@ -112,7 +110,7 @@ func TestSyncRefusesToWipeOnEmptyRegistry(t *testing.T) {
 		t.Fatal("Sync on an empty registry with live commands must error, not delete all")
 	}
 	for _, c := range s.Calls() {
-		if c.Method == "DELETE" {
+		if c.Method == http.MethodDelete {
 			t.Fatalf("Sync must not delete on empty registry: %s %s", c.Method, c.Path)
 		}
 	}
@@ -140,4 +138,45 @@ func names(cs []*Command) []string {
 		out[i] = c.Name()
 	}
 	return out
+}
+
+func TestSyncReportsSyncWouldDeleteWithItsCount(t *testing.T) {
+	s := transport.NewStub()
+	stubGuild(s)
+	s.Reply(`[{"id":"c1","name":"live"},{"id":"c2","name":"other"}]`)
+	err := newReg(s).Sync(context.Background())
+	wipe, ok := errors.AsType[*SyncWouldDeleteError](err)
+	if !ok || wipe.Count != 2 {
+		t.Fatalf("err = %v, want *SyncWouldDeleteError with Count 2", err)
+	}
+}
+
+func TestDispatchReportsAutocompleteInteraction(t *testing.T) {
+	reg := newReg(transport.NewStub())
+	reg.Add(NewCommand("ping", "p"), nil)
+	ix := Interaction{Type: InteractionAutocomplete, Data: InteractionData{Name: "ping"}}
+	_, err := reg.Dispatch(context.Background(), ix)
+	autocomplete, ok := errors.AsType[*AutocompleteInteractionError](err)
+	if !ok || autocomplete.Name != "ping" {
+		t.Fatalf("err = %v, want *AutocompleteInteractionError for ping", err)
+	}
+}
+
+func TestDispatchReportsUnknownCommand(t *testing.T) {
+	reg := newReg(transport.NewStub())
+	_, err := reg.Dispatch(context.Background(), Interaction{Data: InteractionData{Name: "nope"}})
+	unknown, ok := errors.AsType[*UnknownCommandError](err)
+	if !ok || unknown.Name != "nope" {
+		t.Fatalf("err = %v, want *UnknownCommandError for nope", err)
+	}
+}
+
+func TestDispatchAutocompleteReportsMissingHandler(t *testing.T) {
+	reg := newReg(transport.NewStub())
+	reg.Add(NewCommand("pick", "p"), nil)
+	_, err := reg.DispatchAutocomplete(context.Background(), Interaction{Data: InteractionData{Name: "pick"}})
+	missing, ok := errors.AsType[*NoAutocompleteHandlerError](err)
+	if !ok || missing.Name != "pick" {
+		t.Fatalf("err = %v, want *NoAutocompleteHandlerError for pick", err)
+	}
 }

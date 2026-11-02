@@ -2,8 +2,6 @@ package dctl
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -16,26 +14,26 @@ type Guilds struct {
 
 // List returns the servers the bot is a member of.
 func (g *Guilds) List(ctx context.Context) ([]Guild, error) {
-	var gs []Guild
-	if err := g.rt.Do(ctx, http.MethodGet, "/users/@me/guilds", nil, &gs); err != nil {
+	var guilds []Guild
+	if err := g.rt.Do(ctx, http.MethodGet, "/users/@me/guilds", nil, &guilds); err != nil {
 		return nil, err
 	}
-	return gs, nil
+	return guilds, nil
 }
 
 // Sole resolves the bot's single server (mono-server). Errors if the bot is in
 // zero or several guilds, so callers never silently target the wrong one.
 func (g *Guilds) Sole(ctx context.Context) (Guild, error) {
-	gs, err := g.List(ctx)
+	guilds, err := g.List(ctx)
 	if err != nil {
 		return Guild{}, err
 	}
-	switch len(gs) {
+	switch len(guilds) {
 	case 0:
-		return Guild{}, errors.New("dctl: bot is in no server (invite it first)")
+		return Guild{}, ErrNoGuild
 	case 1:
-		return gs[0], nil
+		return guilds[0], nil
 	default:
-		return Guild{}, fmt.Errorf("dctl: bot is in %d servers; pass a guild id", len(gs))
+		return Guild{}, &AmbiguousGuildError{Count: len(guilds)}
 	}
 }

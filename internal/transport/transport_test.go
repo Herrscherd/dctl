@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/iotest"
 )
 
 func TestHTTPDoSetsAuthAndDecodes(t *testing.T) {
@@ -18,7 +20,7 @@ func TestHTTPDoSetsAuthAndDecodes(t *testing.T) {
 		gotUA = r.Header.Get("User-Agent")
 		gotPath = r.URL.Path
 		gotMethod = r.Method
-		w.Write([]byte(`{"id":"42"}`))
+		writeBody(t, w, `{"id":"42"}`)
 	}))
 	defer srv.Close()
 
@@ -35,7 +37,7 @@ func TestHTTPDoSetsAuthAndDecodes(t *testing.T) {
 	if gotUA == "" {
 		t.Error("missing user-agent")
 	}
-	if gotMethod != "GET" || gotPath != "/x" {
+	if gotMethod != http.MethodGet || gotPath != "/x" {
 		t.Errorf("method/path = %s %s", gotMethod, gotPath)
 	}
 	if out.ID != "42" {
@@ -45,15 +47,15 @@ func TestHTTPDoSetsAuthAndDecodes(t *testing.T) {
 
 func TestHTTPDoDisabledWithoutToken(t *testing.T) {
 	rt := NewHTTP("")
-	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != ErrDisabled {
+	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); !errors.Is(err, ErrDisabled) {
 		t.Errorf("err = %v, want ErrDisabled", err)
 	}
 }
 
 func TestHTTPDoSurfacesAPIError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"message":"Missing Permissions"}`))
+		writeBody(t, w, `{"message":"Missing Permissions"}`)
 	}))
 	defer srv.Close()
 	rt := NewHTTP("tok", WithBase(srv.URL))
@@ -61,30 +63,29 @@ func TestHTTPDoSurfacesAPIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error")
 	}
-	if want := "discord 403"; !strings.Contains(err.Error(), want) {
-		t.Errorf("err = %q, want containing %q", err.Error(), want)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("err = %T %v, want *APIError", err, err)
+	}
+	if apiErr.Status != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", apiErr.Status, http.StatusForbidden)
+	}
+	if !strings.Contains(apiErr.Body, "Missing Permissions") {
+		t.Errorf("body = %q, want the Discord message", apiErr.Body)
 	}
 }
 
-// A transport-layer failure (here: connection refused) must not echo the request
-// URL, whose path carries secret tokens (webhook/interaction tokens) into any log
-// the caller writes. net/http returns a *url.Error whose Error() embeds the full
-// URL; Do must scrub it.
 func TestHTTPDoTransportErrorDoesNotLeakToken(t *testing.T) {
 	const secret = "SUPERSECRETWEBHOOKTOKEN"
-	// 127.0.0.1:1 refuses connections, forcing client.Do to fail.
 	rt := NewHTTP("bottok", WithBase("http://127.0.0.1:1"))
 	err := rt.Do(context.Background(), http.MethodPost, "/webhooks/123/"+secret, nil, nil)
 	if err == nil {
 		t.Fatal("want transport error")
 	}
-	// The secret token (a path segment) must never survive into the error string.
-	// The destination host may remain (it is the public API base, not a secret).
 	if strings.Contains(err.Error(), secret) {
 		t.Fatalf("error leaks token: %q", err.Error())
 	}
-	// Cause is preserved for errors.Is against context/network errors.
-	if !strings.Contains(err.Error(), "POST") {
+	if !strings.Contains(err.Error(), http.MethodPost) {
 		t.Fatalf("error dropped method context: %q", err.Error())
 	}
 }
@@ -92,8 +93,10 @@ func TestHTTPDoTransportErrorDoesNotLeakToken(t *testing.T) {
 func TestHTTPDoMarshalsBody(t *testing.T) {
 	var got map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&got)
-		w.Write([]byte(`{}`))
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("decoding request: %v", err)
+		}
+		writeBody(t, w, `{}`)
 	}))
 	defer srv.Close()
 	rt := NewHTTP("tok", WithBase(srv.URL))
@@ -105,19 +108,16 @@ func TestHTTPDoMarshalsBody(t *testing.T) {
 	}
 }
 
-// Discord's buckets are small — five writes per four seconds on some routes — so
-// a caller doing a handful of calls in a row hits one while doing its job. The
-// answer says how long to wait, and waiting it out is the whole fix.
 func TestHTTPDoWaitsOutARateLimit(t *testing.T) {
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		if calls == 1 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"message":"You are being rate limited.","retry_after":0.01}`))
+			writeBody(t, w, `{"message":"You are being rate limited.","retry_after":0.01}`)
 			return
 		}
-		w.Write([]byte(`{"id":"42"}`))
+		writeBody(t, w, `{"id":"42"}`)
 	}))
 	defer srv.Close()
 
@@ -132,19 +132,20 @@ func TestHTTPDoWaitsOutARateLimit(t *testing.T) {
 	}
 }
 
-// A body is consumable, so replaying a write means rebuilding it. Sending the
-// second attempt with an empty body would be worse than not retrying at all.
 func TestARetriedWriteCarriesItsBodyAgain(t *testing.T) {
 	var bodies []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := io.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request: %v", err)
+		}
 		bodies = append(bodies, string(b))
 		if len(bodies) == 1 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"retry_after":0.01}`))
+			writeBody(t, w, `{"retry_after":0.01}`)
 			return
 		}
-		w.Write([]byte(`{}`))
+		writeBody(t, w, `{}`)
 	}))
 	defer srv.Close()
 
@@ -157,14 +158,12 @@ func TestARetriedWriteCarriesItsBodyAgain(t *testing.T) {
 	}
 }
 
-// Past a point the answer is not a bucket refilling in a moment but a quota, and
-// blocking on it would hide that from the caller.
 func TestALongRateLimitIsReportedRatherThanWaitedOut(t *testing.T) {
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"retry_after":3600}`))
+		writeBody(t, w, `{"retry_after":3600}`)
 	}))
 	defer srv.Close()
 
@@ -178,14 +177,12 @@ func TestALongRateLimitIsReportedRatherThanWaitedOut(t *testing.T) {
 	}
 }
 
-// A route that stays limited must not retry forever: the caller is waiting on a
-// call that is never going to land.
 func TestARateLimitThatNeverClearsGivesUp(t *testing.T) {
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"retry_after":0.001}`))
+		writeBody(t, w, `{"retry_after":0.001}`)
 	}))
 	defer srv.Close()
 
@@ -197,17 +194,152 @@ func TestARateLimitThatNeverClearsGivesUp(t *testing.T) {
 	}
 }
 
-// A cancelled context must not be held by a request sitting out a wait.
 func TestAWaitingRequestStopsWithItsContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		cancel()
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"retry_after":20}`))
+		writeBody(t, w, `{"retry_after":20}`)
 	}))
 	defer srv.Close()
 
 	if err := NewHTTP("tok", WithBase(srv.URL)).Do(ctx, http.MethodGet, "/x", nil, nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want the cancellation", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+type closeFailingBody struct {
+	io.Reader
+
+	err error
+}
+
+func (b closeFailingBody) Close() error { return b.err }
+
+func TestHTTPDoAcceptsASuccessWhoseBodyFailsToClose(t *testing.T) {
+	closeErr := errors.New("body close failed")
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       closeFailingBody{Reader: strings.NewReader(`{"id":"42"}`), err: closeErr},
+		}, nil
+	})}
+	var logs strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"), WithLogger(logger))
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := rt.Do(context.Background(), http.MethodPost, "/x", map[string]string{"content": "hi"}, &out); err != nil {
+		t.Fatalf("err = %v, want success: the accepted write must not look failed", err)
+	}
+	if out.ID != "42" {
+		t.Errorf("id = %q, want the decoded reply", out.ID)
+	}
+	if !strings.Contains(logs.String(), closeErr.Error()) {
+		t.Errorf("logs = %q, want the close failure logged", logs.String())
+	}
+}
+
+func TestHTTPDoReportsANotFoundWhenBodyFailsToClose(t *testing.T) {
+	closeErr := errors.New("body close failed")
+	var logs strings.Builder
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       closeFailingBody{Reader: strings.NewReader(`{"message":"Unknown Message"}`), err: closeErr},
+		}, nil
+	})}
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"), WithLogger(logger))
+	err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil)
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok || apiErr.Status != http.StatusNotFound {
+		t.Fatalf("err = %v, want *APIError with status 404", err)
+	}
+	if !strings.Contains(logs.String(), closeErr.Error()) {
+		t.Errorf("logs = %q, want the close failure logged", logs.String())
+	}
+}
+
+func TestHTTPDoRetriesARateLimitWhenBodyFailsToClose(t *testing.T) {
+	closeErr := errors.New("body close failed")
+	calls := 0
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       closeFailingBody{Reader: strings.NewReader(`{"retry_after":0.01}`), err: closeErr},
+			}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})}
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"))
+	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != nil {
+		t.Fatalf("err = %v, want the rate limit retried to success", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want the 429 replayed once", calls)
+	}
+}
+
+func TestHTTPDoReportsANotFoundWhenBodyFailsToRead(t *testing.T) {
+	readErr := errors.New("connection reset")
+	const partial = `{"message":"Unknown Message"`
+	var logs strings.Builder
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(io.MultiReader(strings.NewReader(partial), iotest.ErrReader(readErr))),
+		}, nil
+	})}
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"), WithLogger(logger))
+	err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil)
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok || apiErr.Status != http.StatusNotFound {
+		t.Fatalf("err = %v, want *APIError with status 404", err)
+	}
+	if apiErr.Body != partial {
+		t.Errorf("body = %q, want the partial body kept", apiErr.Body)
+	}
+	if !strings.Contains(logs.String(), readErr.Error()) {
+		t.Errorf("logs = %q, want the read failure logged", logs.String())
+	}
+}
+
+func TestHTTPDoRetriesARateLimitWhenBodyFailsToRead(t *testing.T) {
+	calls := 0
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body: io.NopCloser(io.MultiReader(
+					strings.NewReader(`{"retry_after":0.01}`),
+					iotest.ErrReader(errors.New("connection reset")),
+				)),
+			}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})}
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"))
+	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != nil {
+		t.Fatalf("err = %v, want the rate limit retried to success", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want the 429 replayed once", calls)
+	}
+}
+
+func writeBody(tb testing.TB, w io.Writer, body string) {
+	tb.Helper()
+	if _, err := io.WriteString(w, body); err != nil {
+		tb.Errorf("writing response: %v", err)
 	}
 }

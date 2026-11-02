@@ -7,12 +7,10 @@ import (
 	"github.com/Herrscherd/dctl/internal/transport"
 )
 
-// The registry must be stable across c.Interactions() / .Registry() calls, so
-// bindings registered at setup are visible at dispatch time.
 func TestClientRegistryIsStable(t *testing.T) {
 	c := newWith(transport.NewStub(), "chan")
 	c.Interactions().Registry().Add(NewCommand("ping", "p"),
-		func(ctx context.Context, ix Interaction) (Response, error) {
+		func(_ context.Context, _ Interaction) (Response, error) {
 			return Response{Content: "pong"}, nil
 		})
 
@@ -23,7 +21,6 @@ func TestClientRegistryIsStable(t *testing.T) {
 	}
 }
 
-// Commands default to the guild scope: instant propagation, one server.
 func TestCommandsBaseDefaultsToGuildScope(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"app1"}`).Reply(`[{"id":"g1","name":"srv"}]`)
 	c := newWith(s, "chan")
@@ -34,9 +31,6 @@ func TestCommandsBaseDefaultsToGuildScope(t *testing.T) {
 	}
 }
 
-// A bot installable anywhere cannot pin its commands to one server. Global
-// scope must also skip the guild lookup entirely — that lookup fails outright
-// once the bot is in more than one server.
 func TestGlobalCommandsScopeSkipsGuildLookup(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"app1"}`)
 	c := newWith(s, "chan")
@@ -62,12 +56,11 @@ func TestWithGlobalCommandsConfiguresDefault(t *testing.T) {
 	}
 }
 
-// AppID is fetched once and cached, even across separate sub-client ops.
 func TestAppIDCached(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"app1"}`).Reply(`{"id":"app1"}`)
 	c := newWith(s, "chan")
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if id, err := c.Interactions().AppID(context.Background()); err != nil || id != "app1" {
 			t.Fatalf("AppID = %q, %v", id, err)
 		}

@@ -11,9 +11,9 @@ import (
 
 // Interaction type constants we care about (Discord interaction-type field).
 const (
-	InteractionCommand      = 2 // APPLICATION_COMMAND
-	InteractionComponent    = 3 // MESSAGE_COMPONENT (button/select click)
-	InteractionAutocomplete = 4 // APPLICATION_COMMAND_AUTOCOMPLETE
+	InteractionCommand      = 2
+	InteractionComponent    = 3
+	InteractionAutocomplete = 4
 )
 
 // Interaction is the subset of a Discord INTERACTION_CREATE we handle
@@ -85,13 +85,13 @@ func (d InteractionData) Opt(name string) (string, bool) {
 }
 
 func findOpt(opts []InteractionOption, name string) (string, bool) {
-	for _, o := range opts {
-		if o.Name == name {
-			if s, ok := o.Value.(string); ok {
+	for _, option := range opts {
+		if option.Name == name {
+			if s, ok := option.Value.(string); ok {
 				return s, true
 			}
 		}
-		if v, ok := findOpt(o.Options, name); ok {
+		if v, ok := findOpt(option.Options, name); ok {
 			return v, true
 		}
 	}
@@ -100,24 +100,25 @@ func findOpt(opts []InteractionOption, name string) (string, bool) {
 
 // OptBool returns the bool value of a (possibly nested) option, false if absent.
 func (d InteractionData) OptBool(name string) bool {
-	if b, ok := findBool(d.Options, name); ok {
+	if b, ok := findTyped[bool](d.Options, name); ok {
 		return b
 	}
 	return false
 }
 
-func findBool(opts []InteractionOption, name string) (bool, bool) {
-	for _, o := range opts {
-		if o.Name == name {
-			if b, ok := o.Value.(bool); ok {
-				return b, true
+func findTyped[Value any](opts []InteractionOption, name string) (Value, bool) {
+	for _, option := range opts {
+		if option.Name == name {
+			if v, ok := option.Value.(Value); ok {
+				return v, true
 			}
 		}
-		if b, ok := findBool(o.Options, name); ok {
-			return b, true
+		if v, ok := findTyped[Value](option.Options, name); ok {
+			return v, true
 		}
 	}
-	return false, false
+	var zero Value
+	return zero, false
 }
 
 // OptInt returns the integer value of a (possibly nested) option by name. Discord
@@ -142,11 +143,11 @@ func (d InteractionData) OptFloat(name string) (float64, bool) {
 }
 
 func findValue(opts []InteractionOption, name string) (any, bool) {
-	for _, o := range opts {
-		if o.Name == name && o.Value != nil {
-			return o.Value, true
+	for _, option := range opts {
+		if option.Name == name && option.Value != nil {
+			return option.Value, true
 		}
-		if v, ok := findValue(o.Options, name); ok {
+		if v, ok := findValue(option.Options, name); ok {
 			return v, true
 		}
 	}
@@ -155,28 +156,37 @@ func findValue(opts []InteractionOption, name string) (any, bool) {
 
 // Focused returns the name and current (partial) string value of the option the
 // user is typing in an autocomplete interaction, searching nested subcommands.
-func (d InteractionData) Focused() (name, value string, ok bool) {
-	return findFocused(d.Options)
+func (d InteractionData) Focused() (string, string, bool) {
+	focus, ok := findFocused(d.Options)
+	return focus.name, focus.text, ok
 }
 
-func findFocused(opts []InteractionOption) (string, string, bool) {
-	for _, o := range opts {
-		if o.Focused {
-			s, _ := o.Value.(string)
-			return o.Name, s, true
+type focusedOption struct {
+	name string
+	text string
+}
+
+func findFocused(opts []InteractionOption) (focusedOption, bool) {
+	for _, option := range opts {
+		if option.Focused {
+			text, isText := option.Value.(string)
+			if !isText {
+				text = ""
+			}
+			return focusedOption{name: option.Name, text: text}, true
 		}
-		if n, v, ok := findFocused(o.Options); ok {
-			return n, v, ok
+		if focus, ok := findFocused(option.Options); ok {
+			return focus, true
 		}
 	}
-	return "", "", false
+	return focusedOption{}, false
 }
 
 // Subcommand returns the name of the first sub-command option, if any.
 func (d InteractionData) Subcommand() (string, []InteractionOption) {
-	for _, o := range d.Options {
-		if o.Type == optSubCommand {
-			return o.Name, o.Options
+	for _, option := range d.Options {
+		if option.Type == optSubCommand {
+			return option.Name, option.Options
 		}
 	}
 	return "", nil
@@ -200,14 +210,14 @@ func (in *Interactions) AppID(ctx context.Context) (string, error) {
 	return fetchAppID(ctx, in.rt)
 }
 
-func fetchAppID(ctx context.Context, rt transport.Doer) (string, error) {
-	var u struct {
+func fetchAppID(ctx context.Context, doer transport.Doer) (string, error) {
+	var application struct {
 		ID string `json:"id"`
 	}
-	if err := rt.Do(ctx, http.MethodGet, "/users/@me", nil, &u); err != nil {
+	if err := doer.Do(ctx, http.MethodGet, "/users/@me", nil, &application); err != nil {
 		return "", err
 	}
-	return u.ID, nil
+	return application.ID, nil
 }
 
 // RegisteredCommand is the read form of a registered command.
@@ -217,9 +227,6 @@ type RegisteredCommand struct {
 	Description string `json:"description"`
 }
 
-// commandsBase is the command collection every command op reads and writes:
-// the application's global commands when the client asked for them
-// (WithGlobalCommands), otherwise the default guild's.
 func (in *Interactions) commandsBase(ctx context.Context) (string, error) {
 	appID, err := in.AppID(ctx)
 	if err != nil {
@@ -280,21 +287,21 @@ func (in *Interactions) Create(ctx context.Context, cmd *Command) (RegisteredCom
 }
 
 // Edit updates the command with the given id.
-func (in *Interactions) Edit(ctx context.Context, id string, cmd *Command) error {
+func (in *Interactions) Edit(ctx context.Context, commandID string, cmd *Command) error {
 	base, err := in.commandsBase(ctx)
 	if err != nil {
 		return err
 	}
-	return in.rt.Do(ctx, http.MethodPatch, base+"/"+seg(id), cmd.build(), nil)
+	return in.rt.Do(ctx, http.MethodPatch, base+"/"+seg(commandID), cmd.build(), nil)
 }
 
 // Delete removes the command with the given id.
-func (in *Interactions) Delete(ctx context.Context, id string) error {
+func (in *Interactions) Delete(ctx context.Context, commandID string) error {
 	base, err := in.commandsBase(ctx)
 	if err != nil {
 		return err
 	}
-	return in.rt.Do(ctx, http.MethodDelete, base+"/"+seg(id), nil, nil)
+	return in.rt.Do(ctx, http.MethodDelete, base+"/"+seg(commandID), nil, nil)
 }
 
 // Registry returns the command registry bound to these interactions. The same
@@ -302,69 +309,67 @@ func (in *Interactions) Delete(ctx context.Context, id string) error {
 // at dispatch time.
 func (in *Interactions) Registry() *Registry {
 	in.regOnce.Do(func() {
-		in.reg = &Registry{in: in, entries: map[string]regEntry{}}
+		in.reg = &Registry{in: in, entries: make(map[string]regEntry)}
 	})
 	return in.reg
 }
 
 // Respond sends a CHANNEL_MESSAGE_WITH_SOURCE (type 4) reply.
-func (in *Interactions) Respond(ctx context.Context, id, token string, r Response) error {
-	data := map[string]any{"content": r.Content}
-	if r.Ephemeral {
-		data["flags"] = 1 << 6
+func (in *Interactions) Respond(ctx context.Context, interactionID, token string, response Response) error {
+	data := map[string]any{fieldContent: response.Content}
+	if response.Ephemeral {
+		data["flags"] = flagEphemeral
 	}
-	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback",
-		map[string]any{"type": 4, "data": data}, nil)
+	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(interactionID)+"/"+seg(token)+"/callback",
+		map[string]any{fieldType: callbackChannelMessage, fieldData: data}, nil)
 }
 
 // Defer acknowledges an interaction with a DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
 // (type 5). The ephemeral flag must match the eventual reply's visibility.
-func (in *Interactions) Defer(ctx context.Context, id, token string, ephemeral bool) error {
-	data := map[string]any{}
+func (in *Interactions) Defer(ctx context.Context, interactionID, token string, ephemeral bool) error {
+	data := make(map[string]any)
 	if ephemeral {
-		data["flags"] = 1 << 6
+		data["flags"] = flagEphemeral
 	}
-	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback",
-		map[string]any{"type": 5, "data": data}, nil)
+	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(interactionID)+"/"+seg(token)+"/callback",
+		map[string]any{fieldType: callbackDeferredMessage, fieldData: data}, nil)
 }
 
 // RespondAutocomplete sends an APPLICATION_COMMAND_AUTOCOMPLETE_RESULT (type 8)
 // reply carrying the suggestion list. Discord accepts at most 25 choices; extras
 // are dropped here so callers need not pre-trim.
-func (in *Interactions) RespondAutocomplete(ctx context.Context, id, token string, choices []AutocompleteChoice) error {
-	if len(choices) > 25 {
-		choices = choices[:25]
+func (in *Interactions) RespondAutocomplete(ctx context.Context, interactionID, token string, choices []AutocompleteChoice) error {
+	if len(choices) > maxAutocompleteChoices {
+		choices = choices[:maxAutocompleteChoices]
 	}
-	cs := make([]map[string]any, 0, len(choices))
+	encoded := make([]map[string]any, 0, len(choices))
 	for _, ch := range choices {
-		cs = append(cs, map[string]any{"name": ch.Name, "value": ch.Value})
+		encoded = append(encoded, map[string]any{fieldName: ch.Name, fieldValue: ch.Value})
 	}
-	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(id)+"/"+seg(token)+"/callback",
-		map[string]any{"type": 8, "data": map[string]any{"choices": cs}}, nil)
+	return in.rt.Do(ctx, http.MethodPost, "/interactions/"+seg(interactionID)+"/"+seg(token)+"/callback",
+		map[string]any{fieldType: callbackAutocompleteResult, fieldData: map[string]any{"choices": encoded}}, nil)
 }
 
 // EditResponse fills in the deferred reply by editing the original interaction
 // response via the webhook endpoint. appID is the bot's application id (see
 // AppID); the interaction token authorizes the edit for ~15 minutes.
-func (in *Interactions) EditResponse(ctx context.Context, appID, token string, r Response) error {
+func (in *Interactions) EditResponse(ctx context.Context, appID, token string, response Response) error {
 	return in.rt.Do(ctx, http.MethodPatch, "/webhooks/"+seg(appID)+"/"+seg(token)+"/messages/@original",
-		map[string]any{"content": r.Content}, nil)
+		map[string]any{fieldContent: response.Content}, nil)
 }
 
 // UpsertStatusMessage edits the existing status message or sends a new one,
 // returning the live message id.
 func (in *Interactions) UpsertStatusMessage(ctx context.Context, channelID, msgID, content string) (string, error) {
-	// Route through Messages so message path/body construction lives in one place;
-	// only the edit→send 404 fallback is specific to this call.
 	msgs := &Messages{rt: in.rt, def: in.def}
 	if msgID != "" {
-		if _, err := msgs.Edit(ctx, channelID, msgID, content); err == nil {
+		_, err := msgs.Edit(ctx, channelID, msgID, content)
+		if err == nil {
 			return msgID, nil
-		} else {
-			var apiErr *transport.APIError
-			if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
-				return "", err
-			}
+		}
+		var apiErr *transport.APIError
+		if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
+			return "", err
 		}
 	}
 	sent, err := msgs.Send(ctx, channelID, content)
