@@ -1,6 +1,7 @@
 package dctl
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -20,6 +21,7 @@ type ClientOption func(*clientConfig)
 
 type clientConfig struct {
 	httpClient *http.Client
+	logger     *slog.Logger
 	guild      string
 	global     bool
 }
@@ -27,6 +29,13 @@ type clientConfig struct {
 // WithHTTPClient overrides the default 15s-timeout HTTP client.
 func WithHTTPClient(h *http.Client) ClientOption {
 	return func(c *clientConfig) { c.httpClient = h }
+}
+
+// WithLogger sets the logger that reports transport events the caller cannot
+// act on, such as a response body that fails to close after a successful call.
+// Without it those events are discarded.
+func WithLogger(logger *slog.Logger) ClientOption {
+	return func(c *clientConfig) { c.logger = logger }
 }
 
 // WithGuild pins the guild that guild-scoped ops target when no explicit id is
@@ -56,6 +65,9 @@ func New(token, defaultChannel string, opts ...ClientOption) *Client {
 	var topts []transport.Option
 	if cfg.httpClient != nil {
 		topts = append(topts, transport.WithHTTPClient(cfg.httpClient))
+	}
+	if cfg.logger != nil {
+		topts = append(topts, transport.WithLogger(cfg.logger))
 	}
 	rt := transport.NewHTTP(token, topts...)
 	client := newWith(rt, defaultChannel)
