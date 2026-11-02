@@ -98,6 +98,8 @@ func (r *Registry) snapshot() []desiredCmd {
 // Sync reconciles Discord with the registry: it creates new commands, edits
 // existing ones, and deletes those no longer bound. It refuses to run on an
 // empty registry while commands exist, to avoid silently deleting everything.
+//
+// It returns a [*SyncWouldDeleteError] when the registry is empty and commands exist. It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (r *Registry) Sync(ctx context.Context) error {
 	base, err := r.in.commandsBase(ctx)
 	if err != nil {
