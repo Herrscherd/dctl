@@ -24,7 +24,7 @@ func TestThreadsStart(t *testing.T) {
 	if c.Path != "/channels/c/messages/m/threads" {
 		t.Errorf("path = %s", c.Path)
 	}
-	body := c.Body.(map[string]any)
+	body := asType[map[string]any](t, c.Body)
 	if body["name"] != "topic" {
 		t.Errorf("name = %v", body["name"])
 	}
@@ -46,7 +46,7 @@ func TestThreadsStartPrivate(t *testing.T) {
 	if c.Method != "POST" || c.Path != "/channels/c1/threads" {
 		t.Fatalf("call = %s %s", c.Method, c.Path)
 	}
-	body := c.Body.(map[string]any)
+	body := asType[map[string]any](t, c.Body)
 	if body["type"] != ChannelPrivateThread {
 		t.Errorf("type = %v, want a private thread", body["type"])
 	}
@@ -84,7 +84,7 @@ func TestThreadsCreateForum(t *testing.T) {
 	if c.Method != "POST" || c.Path != "/guilds/g1/channels" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
-	body := c.Body.(map[string]any)
+	body := asType[map[string]any](t, c.Body)
 	if body["type"] != ChannelForum {
 		t.Errorf("type = %v", body["type"])
 	}
@@ -103,8 +103,8 @@ func TestThreadsForumPost(t *testing.T) {
 	if c.Path != "/channels/f1/threads" {
 		t.Errorf("path = %s", c.Path)
 	}
-	body := c.Body.(map[string]any)
-	msg := body["message"].(map[string]any)
+	body := asType[map[string]any](t, c.Body)
+	msg := asType[map[string]any](t, body["message"])
 	if msg["content"] != "body" {
 		t.Errorf("message.content = %v", msg["content"])
 	}

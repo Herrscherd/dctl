@@ -23,7 +23,7 @@ func TestStubCapturesAndReplies(t *testing.T) {
 	if call.Method != "POST" || call.Path != "/channels/1/messages" {
 		t.Errorf("captured %s %s", call.Method, call.Path)
 	}
-	if call.Body.(map[string]any)["content"] != "hi" {
+	if mapBody(t, call.Body)["content"] != "hi" {
 		t.Errorf("body = %v", call.Body)
 	}
 }
@@ -34,4 +34,13 @@ func TestStubReturnsConfiguredError(t *testing.T) {
 	if err := s.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != context.DeadlineExceeded {
 		t.Errorf("err = %v", err)
 	}
+}
+
+func mapBody(tb testing.TB, body any) map[string]any {
+	tb.Helper()
+	m, ok := body.(map[string]any)
+	if !ok {
+		tb.Fatalf("body is %T, want map[string]any", body)
+	}
+	return m
 }
