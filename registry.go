@@ -2,7 +2,6 @@ package dctl
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"sync"
 )
@@ -111,7 +110,7 @@ func (r *Registry) Sync(ctx context.Context) error {
 
 	desired := r.snapshot()
 	if len(desired) == 0 && len(existing) > 0 {
-		return fmt.Errorf("dctl: Sync on empty registry would delete %d command(s); add commands first", len(existing))
+		return &SyncWouldDeleteError{Count: len(existing)}
 	}
 
 	byName := make(map[string]RegisteredCommand, len(existing))
@@ -145,13 +144,13 @@ func (r *Registry) Sync(ctx context.Context) error {
 // Autocomplete interactions must go through DispatchAutocomplete instead.
 func (r *Registry) Dispatch(ctx context.Context, ix Interaction) (Response, error) {
 	if ix.Type == InteractionAutocomplete {
-		return Response{}, fmt.Errorf("dctl: autocomplete interaction for %q; use DispatchAutocomplete", ix.Data.Name)
+		return Response{}, &AutocompleteInteractionError{Name: ix.Data.Name}
 	}
 	r.mu.Lock()
 	e, ok := r.entries[ix.Data.Name]
 	r.mu.Unlock()
 	if !ok {
-		return Response{}, fmt.Errorf("dctl: unknown command %q", ix.Data.Name)
+		return Response{}, &UnknownCommandError{Name: ix.Data.Name}
 	}
 	return e.handler(ctx, ix)
 }
@@ -163,7 +162,7 @@ func (r *Registry) DispatchAutocomplete(ctx context.Context, ix Interaction) ([]
 	e, ok := r.entries[ix.Data.Name]
 	r.mu.Unlock()
 	if !ok || e.autocomplete == nil {
-		return nil, fmt.Errorf("dctl: no autocomplete handler for %q", ix.Data.Name)
+		return nil, &NoAutocompleteHandlerError{Name: ix.Data.Name}
 	}
 	return e.autocomplete(ctx, ix)
 }

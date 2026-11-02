@@ -2,8 +2,6 @@ package dctl
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/Herrscherd/dctl/internal/transport"
@@ -32,10 +30,10 @@ func (g *Guilds) Sole(ctx context.Context) (Guild, error) {
 	}
 	switch len(gs) {
 	case 0:
-		return Guild{}, errors.New("dctl: bot is in no server (invite it first)")
+		return Guild{}, ErrNoGuild
 	case 1:
 		return gs[0], nil
 	default:
-		return Guild{}, fmt.Errorf("dctl: bot is in %d servers; pass a guild id", len(gs))
+		return Guild{}, &AmbiguousGuildError{Count: len(gs)}
 	}
 }
