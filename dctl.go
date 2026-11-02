@@ -86,16 +86,35 @@ func (c *Client) DefaultChannel() string {
 	return c.def.channel
 }
 
-// Sub-client accessors. Each shares the transport and (where relevant) the
-// default channel/guild resolver.
-func (c *Client) Guilds() *Guilds             { return c.guilds }
-func (c *Client) Messages() *Messages         { return &Messages{rt: c.rt, def: c.def} }
-func (c *Client) Channels() *Channels         { return &Channels{rt: c.rt, def: c.def} }
-func (c *Client) Roles() *Roles               { return &Roles{rt: c.rt, def: c.def} }
-func (c *Client) Members() *Members           { return &Members{rt: c.rt, def: c.def} }
-func (c *Client) Reactions() *Reactions       { return &Reactions{rt: c.rt, def: c.def} }
-func (c *Client) Threads() *Threads           { return &Threads{rt: c.rt, def: c.def} }
-func (c *Client) Permissions() *Permissions   { return &Permissions{rt: c.rt} }
-func (c *Client) Webhooks() *Webhooks         { return &Webhooks{rt: c.rt} }
+// Guilds returns the client for the servers the bot is in.
+func (c *Client) Guilds() *Guilds { return c.guilds }
+
+// Messages returns the client for messages.
+func (c *Client) Messages() *Messages { return &Messages{rt: c.rt, def: c.def} }
+
+// Channels returns the client for channels.
+func (c *Client) Channels() *Channels { return &Channels{rt: c.rt, def: c.def} }
+
+// Roles returns the client for server roles.
+func (c *Client) Roles() *Roles { return &Roles{rt: c.rt, def: c.def} }
+
+// Members returns the client for server members.
+func (c *Client) Members() *Members { return &Members{rt: c.rt, def: c.def} }
+
+// Reactions returns the client for message reactions.
+func (c *Client) Reactions() *Reactions { return &Reactions{rt: c.rt, def: c.def} }
+
+// Threads returns the client for threads.
+func (c *Client) Threads() *Threads { return &Threads{rt: c.rt, def: c.def} }
+
+// Permissions returns the client for channel permission overwrites.
+func (c *Client) Permissions() *Permissions { return &Permissions{rt: c.rt} }
+
+// Webhooks returns the client for webhooks.
+func (c *Client) Webhooks() *Webhooks { return &Webhooks{rt: c.rt} }
+
+// Interactions returns the client that answers interactions.
 func (c *Client) Interactions() *Interactions { return c.interactions }
-func (c *Client) Components() *Components     { return &Components{rt: c.rt, def: c.def} }
+
+// Components returns the client for message components.
+func (c *Client) Components() *Components { return &Components{rt: c.rt, def: c.def} }

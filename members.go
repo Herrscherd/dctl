@@ -34,6 +34,8 @@ func (m *Members) List(ctx context.Context, guildID string, limit int) ([]GuildM
 	return ms, nil
 }
 
+// Get returns the member of a server with the given user ID. An empty guildID
+// falls back to the sole server the bot is in, see [Guilds.Sole] for its errors.
 func (m *Members) Get(ctx context.Context, guildID, userID string) (*GuildMember, error) {
 	gid, err := m.def.resolveGuild(ctx, guildID)
 	if err != nil {
@@ -46,6 +48,7 @@ func (m *Members) Get(ctx context.Context, guildID, userID string) (*GuildMember
 	return &gm, nil
 }
 
+// Kick removes a member from a server. The server is resolved as in [Members.Get].
 func (m *Members) Kick(ctx context.Context, guildID, userID string) error {
 	gid, err := m.def.resolveGuild(ctx, guildID)
 	if err != nil {
@@ -54,6 +57,7 @@ func (m *Members) Kick(ctx context.Context, guildID, userID string) error {
 	return m.rt.Do(ctx, http.MethodDelete, "/guilds/"+seg(gid)+"/members/"+seg(userID), nil, nil)
 }
 
+// Ban bans a user from a server. The server is resolved as in [Members.Get].
 func (m *Members) Ban(ctx context.Context, guildID, userID string) error {
 	gid, err := m.def.resolveGuild(ctx, guildID)
 	if err != nil {

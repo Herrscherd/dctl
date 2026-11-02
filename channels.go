@@ -37,6 +37,7 @@ func (c *Channels) List(ctx context.Context, guildID string) ([]Channel, error) 
 	return chs, nil
 }
 
+// Get returns the channel with the given ID.
 func (c *Channels) Get(ctx context.Context, channelID string) (*Channel, error) {
 	var ch Channel
 	if err := c.rt.Do(ctx, http.MethodGet, "/channels/"+seg(channelID), nil, &ch); err != nil {
@@ -92,6 +93,7 @@ func (c *Channels) create(ctx context.Context, guildID string, body map[string]a
 	return &ch, nil
 }
 
+// Rename sets the name of a channel and returns the updated channel.
 func (c *Channels) Rename(ctx context.Context, channelID, name string) (*Channel, error) {
 	return c.Update(ctx, channelID, map[string]any{fieldName: name})
 }
@@ -105,6 +107,7 @@ func (c *Channels) Update(ctx context.Context, channelID string, fields map[stri
 	return &ch, nil
 }
 
+// Delete removes a channel. It returns [ErrNoChannel] when channelID is empty.
 func (c *Channels) Delete(ctx context.Context, channelID string) error {
 	if channelID == "" {
 		return ErrNoChannel
