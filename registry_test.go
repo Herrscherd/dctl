@@ -139,3 +139,44 @@ func names(cs []*Command) []string {
 	}
 	return out
 }
+
+func TestSyncReportsSyncWouldDeleteWithItsCount(t *testing.T) {
+	s := transport.NewStub()
+	stubGuild(s)
+	s.Reply(`[{"id":"c1","name":"live"},{"id":"c2","name":"other"}]`)
+	err := newReg(s).Sync(context.Background())
+	wipe, ok := errors.AsType[*SyncWouldDeleteError](err)
+	if !ok || wipe.Count != 2 {
+		t.Fatalf("err = %v, want *SyncWouldDeleteError with Count 2", err)
+	}
+}
+
+func TestDispatchReportsAutocompleteInteraction(t *testing.T) {
+	reg := newReg(transport.NewStub())
+	reg.Add(NewCommand("ping", "p"), nil)
+	ix := Interaction{Type: InteractionAutocomplete, Data: InteractionData{Name: "ping"}}
+	_, err := reg.Dispatch(context.Background(), ix)
+	autocomplete, ok := errors.AsType[*AutocompleteInteractionError](err)
+	if !ok || autocomplete.Name != "ping" {
+		t.Fatalf("err = %v, want *AutocompleteInteractionError for ping", err)
+	}
+}
+
+func TestDispatchReportsUnknownCommand(t *testing.T) {
+	reg := newReg(transport.NewStub())
+	_, err := reg.Dispatch(context.Background(), Interaction{Data: InteractionData{Name: "nope"}})
+	unknown, ok := errors.AsType[*UnknownCommandError](err)
+	if !ok || unknown.Name != "nope" {
+		t.Fatalf("err = %v, want *UnknownCommandError for nope", err)
+	}
+}
+
+func TestDispatchAutocompleteReportsMissingHandler(t *testing.T) {
+	reg := newReg(transport.NewStub())
+	reg.Add(NewCommand("pick", "p"), nil)
+	_, err := reg.DispatchAutocomplete(context.Background(), Interaction{Data: InteractionData{Name: "pick"}})
+	missing, ok := errors.AsType[*NoAutocompleteHandlerError](err)
+	if !ok || missing.Name != "pick" {
+		t.Fatalf("err = %v, want *NoAutocompleteHandlerError for pick", err)
+	}
+}
