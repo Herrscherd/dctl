@@ -244,18 +244,46 @@ func TestHTTPDoAcceptsASuccessWhoseBodyFailsToClose(t *testing.T) {
 	}
 }
 
-func TestHTTPDoJoinsBodyCloseErrorOnFailure(t *testing.T) {
+func TestHTTPDoReportsANotFoundWhenBodyFailsToClose(t *testing.T) {
 	closeErr := errors.New("body close failed")
+	var logs strings.Builder
 	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return &http.Response{
-			StatusCode: http.StatusInternalServerError,
-			Body:       closeFailingBody{Reader: strings.NewReader(`{}`), err: closeErr},
+			StatusCode: http.StatusNotFound,
+			Body:       closeFailingBody{Reader: strings.NewReader(`{"message":"Unknown Message"}`), err: closeErr},
 		}, nil
 	})}
-	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"))
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"), WithLogger(logger))
 	err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil)
-	if !errors.Is(err, closeErr) {
-		t.Fatalf("err = %v, want the body close error on a failed call", err)
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok || apiErr.Status != http.StatusNotFound {
+		t.Fatalf("err = %v, want *APIError with status 404", err)
+	}
+	if !strings.Contains(logs.String(), closeErr.Error()) {
+		t.Errorf("logs = %q, want the close failure logged", logs.String())
+	}
+}
+
+func TestHTTPDoRetriesARateLimitWhenBodyFailsToClose(t *testing.T) {
+	closeErr := errors.New("body close failed")
+	calls := 0
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       closeFailingBody{Reader: strings.NewReader(`{"retry_after":0.01}`), err: closeErr},
+			}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})}
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"))
+	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != nil {
+		t.Fatalf("err = %v, want the rate limit retried to success", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want the 429 replayed once", calls)
 	}
 }
 

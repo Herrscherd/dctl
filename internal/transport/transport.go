@@ -190,14 +190,11 @@ func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, has
 	}
 	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	closeErr := resp.Body.Close()
-	if readErr == nil && isSuccess(resp.StatusCode) {
-		if closeErr != nil {
-			h.logger.Warn("response body failed to close after a successful call", "method", method, "status", resp.StatusCode, "error", closeErr)
-		}
-		return response{body: respBody, status: resp.StatusCode}, nil
+	if readErr != nil {
+		return response{}, fmt.Errorf("reading response: %w", errors.Join(readErr, closeErr))
 	}
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return response{}, fmt.Errorf("reading response: %w", err)
+	if closeErr != nil {
+		h.logger.Warn("response body failed to close", "method", method, "status", resp.StatusCode, "error", closeErr)
 	}
 	return response{body: respBody, status: resp.StatusCode}, nil
 }
