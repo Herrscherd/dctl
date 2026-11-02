@@ -24,14 +24,14 @@ func (m *Members) List(ctx context.Context, guildID string, limit int) ([]GuildM
 	if limit <= 0 || limit > 1000 {
 		limit = 100
 	}
-	var ms []GuildMember
-	q := url.Values{}
-	q.Set("limit", strconv.Itoa(limit))
-	path := "/guilds/" + seg(gid) + "/members?" + q.Encode()
-	if err := m.rt.Do(ctx, http.MethodGet, path, nil, &ms); err != nil {
+	var members []GuildMember
+	query := url.Values{}
+	query.Set("limit", strconv.Itoa(limit))
+	path := "/guilds/" + seg(gid) + "/members?" + query.Encode()
+	if err := m.rt.Do(ctx, http.MethodGet, path, nil, &members); err != nil {
 		return nil, err
 	}
-	return ms, nil
+	return members, nil
 }
 
 // Get returns the member of a server with the given user ID. An empty guildID
@@ -41,11 +41,11 @@ func (m *Members) Get(ctx context.Context, guildID, userID string) (*GuildMember
 	if err != nil {
 		return nil, err
 	}
-	var gm GuildMember
-	if err := m.rt.Do(ctx, http.MethodGet, "/guilds/"+seg(gid)+"/members/"+seg(userID), nil, &gm); err != nil {
+	var member GuildMember
+	if err := m.rt.Do(ctx, http.MethodGet, "/guilds/"+seg(gid)+"/members/"+seg(userID), nil, &member); err != nil {
 		return nil, err
 	}
-	return &gm, nil
+	return &member, nil
 }
 
 // Kick removes a member from a server. The server is resolved as in [Members.Get].

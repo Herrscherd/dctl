@@ -19,11 +19,11 @@ func (r *Roles) List(ctx context.Context, guildID string) ([]Role, error) {
 	if err != nil {
 		return nil, err
 	}
-	var rs []Role
-	if err := r.rt.Do(ctx, http.MethodGet, "/guilds/"+seg(gid)+"/roles", nil, &rs); err != nil {
+	var roles []Role
+	if err := r.rt.Do(ctx, http.MethodGet, "/guilds/"+seg(gid)+"/roles", nil, &roles); err != nil {
 		return nil, err
 	}
-	return rs, nil
+	return roles, nil
 }
 
 // Create creates a role named name in guildID (or the sole guild).

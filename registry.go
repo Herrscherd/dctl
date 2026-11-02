@@ -28,16 +28,16 @@ type Registry struct {
 }
 
 // Add binds a command to a handler, replacing any existing binding by name.
-func (r *Registry) Add(cmd *Command, h Handler) *Registry {
+func (r *Registry) Add(cmd *Command, handler Handler) *Registry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	name := cmd.Name()
-	e := r.entries[name]
-	if e.cmd == nil {
+	entry := r.entries[name]
+	if entry.cmd == nil {
 		r.order = append(r.order, name)
 	}
-	e.cmd, e.handler = cmd, h
-	r.entries[name] = e
+	entry.cmd, entry.handler = cmd, handler
+	r.entries[name] = entry
 	return r
 }
 
@@ -45,12 +45,12 @@ func (r *Registry) Add(cmd *Command, h Handler) *Registry {
 func (r *Registry) Update(cmd *Command, h Handler) *Registry { return r.Add(cmd, h) }
 
 // Autocomplete attaches an autocomplete handler to an already-added command.
-func (r *Registry) Autocomplete(name string, h AutocompleteHandler) *Registry {
+func (r *Registry) Autocomplete(name string, handler AutocompleteHandler) *Registry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if e, ok := r.entries[name]; ok {
-		e.autocomplete = h
-		r.entries[name] = e
+	if entry, ok := r.entries[name]; ok {
+		entry.autocomplete = handler
+		r.entries[name] = entry
 	}
 	return r
 }
@@ -60,9 +60,9 @@ func (r *Registry) Remove(name string) *Registry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.entries, name)
-	for i, n := range r.order {
+	for index, n := range r.order {
 		if n == name {
-			r.order = append(r.order[:i], r.order[i+1:]...)
+			r.order = append(r.order[:index], r.order[index+1:]...)
 			break
 		}
 	}
@@ -122,9 +122,9 @@ func (r *Registry) Sync(ctx context.Context) error {
 	for _, d := range desired {
 		keep[d.name] = true
 	}
-	for _, c := range existing {
-		if !keep[c.Name] {
-			if err := r.in.rt.Do(ctx, http.MethodDelete, base+"/"+seg(c.ID), nil, nil); err != nil {
+	for _, existingCommand := range existing {
+		if !keep[existingCommand.Name] {
+			if err := r.in.rt.Do(ctx, http.MethodDelete, base+"/"+seg(existingCommand.ID), nil, nil); err != nil {
 				return err
 			}
 		}
@@ -137,12 +137,12 @@ func (r *Registry) upsertCommands(ctx context.Context, base string, desired []de
 	for _, c := range existing {
 		byName[c.Name] = c
 	}
-	for _, d := range desired {
+	for _, wantedCommand := range desired {
 		method, path := http.MethodPost, base
-		if cur, ok := byName[d.name]; ok {
+		if cur, ok := byName[wantedCommand.name]; ok {
 			method, path = http.MethodPatch, base+"/"+seg(cur.ID)
 		}
-		if err := r.in.rt.Do(ctx, method, path, d.body, nil); err != nil {
+		if err := r.in.rt.Do(ctx, method, path, wantedCommand.body, nil); err != nil {
 			return err
 		}
 	}
@@ -151,27 +151,27 @@ func (r *Registry) upsertCommands(ctx context.Context, base string, desired []de
 
 // Dispatch routes a command interaction to its handler by command name.
 // Autocomplete interactions must go through DispatchAutocomplete instead.
-func (r *Registry) Dispatch(ctx context.Context, ix Interaction) (Response, error) {
-	if ix.Type == InteractionAutocomplete {
-		return Response{}, &AutocompleteInteractionError{Name: ix.Data.Name}
+func (r *Registry) Dispatch(ctx context.Context, interaction Interaction) (Response, error) {
+	if interaction.Type == InteractionAutocomplete {
+		return Response{}, &AutocompleteInteractionError{Name: interaction.Data.Name}
 	}
 	r.mu.Lock()
-	e, ok := r.entries[ix.Data.Name]
+	entry, ok := r.entries[interaction.Data.Name]
 	r.mu.Unlock()
 	if !ok {
-		return Response{}, &UnknownCommandError{Name: ix.Data.Name}
+		return Response{}, &UnknownCommandError{Name: interaction.Data.Name}
 	}
-	return e.handler(ctx, ix)
+	return entry.handler(ctx, interaction)
 }
 
 // DispatchAutocomplete routes an autocomplete interaction to its autocomplete
 // handler by command name.
-func (r *Registry) DispatchAutocomplete(ctx context.Context, ix Interaction) ([]AutocompleteChoice, error) {
+func (r *Registry) DispatchAutocomplete(ctx context.Context, interaction Interaction) ([]AutocompleteChoice, error) {
 	r.mu.Lock()
-	e, ok := r.entries[ix.Data.Name]
+	entry, ok := r.entries[interaction.Data.Name]
 	r.mu.Unlock()
-	if !ok || e.autocomplete == nil {
-		return nil, &NoAutocompleteHandlerError{Name: ix.Data.Name}
+	if !ok || entry.autocomplete == nil {
+		return nil, &NoAutocompleteHandlerError{Name: interaction.Data.Name}
 	}
-	return e.autocomplete(ctx, ix)
+	return entry.autocomplete(ctx, interaction)
 }
