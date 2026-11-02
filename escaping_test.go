@@ -46,3 +46,25 @@ func TestReactionsEscapeIDs(t *testing.T) {
 		t.Errorf("messageID not escaped: %s", path)
 	}
 }
+
+func TestSegEscapesPathAndQueryDelimiters(t *testing.T) {
+	cases := map[string]string{
+		"/":  "%2F",
+		"?":  "%3F",
+		"#":  "%23",
+		"%":  "%25",
+		"..": "%2E%2E",
+		".":  "%2E",
+	}
+	for raw, want := range cases {
+		if got := seg(raw); got != want {
+			t.Errorf("seg(%q) = %q, want %q", raw, got, want)
+		}
+	}
+	for _, raw := range []string{"a/b", "a?b", "a#b", "../x", "x%2Fy"} {
+		got := seg(raw)
+		if strings.ContainsAny(got, "/?#") {
+			t.Errorf("seg(%q) = %q keeps a delimiter", raw, got)
+		}
+	}
+}
