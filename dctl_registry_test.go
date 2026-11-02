@@ -10,7 +10,7 @@ import (
 func TestClientRegistryIsStable(t *testing.T) {
 	c := newWith(transport.NewStub(), "chan")
 	c.Interactions().Registry().Add(NewCommand("ping", "p"),
-		func(ctx context.Context, ix Interaction) (Response, error) {
+		func(_ context.Context, _ Interaction) (Response, error) {
 			return Response{Content: "pong"}, nil
 		})
 

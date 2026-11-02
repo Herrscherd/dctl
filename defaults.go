@@ -22,7 +22,7 @@ type defaults struct {
 	muApp    sync.Mutex
 	appID    string
 	muGuild  sync.Mutex
-	soleGuid string
+	soleGUID string
 }
 
 func (d *defaults) resolveChannel(channelID string) (string, error) {
@@ -44,15 +44,15 @@ func (d *defaults) resolveGuild(ctx context.Context, guildID string) (string, er
 	}
 	d.muGuild.Lock()
 	defer d.muGuild.Unlock()
-	if d.soleGuid != "" {
-		return d.soleGuid, nil
+	if d.soleGUID != "" {
+		return d.soleGUID, nil
 	}
 	g, err := d.guilds.Sole(ctx)
 	if err != nil {
 		return "", err
 	}
-	d.soleGuid = g.ID
-	return d.soleGuid, nil
+	d.soleGUID = g.ID
+	return d.soleGUID, nil
 }
 
 func (d *defaults) appIDOnce(ctx context.Context) (string, error) {

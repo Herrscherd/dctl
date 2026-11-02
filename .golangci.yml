@@ -186,6 +186,9 @@ linters:
       - path: ^interactions\.go$
         linters: [gocritic]
         text: "consider giving a name to these results"
+      - path: ^interactions\.go$
+        linters: [revive]
+        text: "unnamed results of the same type"
 
 formatters:
   enable:

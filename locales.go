@@ -3,6 +3,7 @@ package dctl
 // Locale is a Discord locale code for command/option/choice localization.
 type Locale string
 
+// Locales are the locale codes Discord accepts for localized names and descriptions.
 const (
 	LocaleID    Locale = "id"
 	LocaleDA    Locale = "da"

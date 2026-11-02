@@ -309,7 +309,7 @@ func (in *Interactions) Delete(ctx context.Context, id string) error {
 // at dispatch time.
 func (in *Interactions) Registry() *Registry {
 	in.regOnce.Do(func() {
-		in.reg = &Registry{in: in, entries: map[string]regEntry{}}
+		in.reg = &Registry{in: in, entries: make(map[string]regEntry)}
 	})
 	return in.reg
 }
@@ -327,7 +327,7 @@ func (in *Interactions) Respond(ctx context.Context, id, token string, r Respons
 // Defer acknowledges an interaction with a DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
 // (type 5). The ephemeral flag must match the eventual reply's visibility.
 func (in *Interactions) Defer(ctx context.Context, id, token string, ephemeral bool) error {
-	data := map[string]any{}
+	data := make(map[string]any)
 	if ephemeral {
 		data["flags"] = flagEphemeral
 	}
@@ -363,13 +363,13 @@ func (in *Interactions) EditResponse(ctx context.Context, appID, token string, r
 func (in *Interactions) UpsertStatusMessage(ctx context.Context, channelID, msgID, content string) (string, error) {
 	msgs := &Messages{rt: in.rt, def: in.def}
 	if msgID != "" {
-		if _, err := msgs.Edit(ctx, channelID, msgID, content); err == nil {
+		_, err := msgs.Edit(ctx, channelID, msgID, content)
+		if err == nil {
 			return msgID, nil
-		} else {
-			var apiErr *transport.APIError
-			if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
-				return "", err
-			}
+		}
+		var apiErr *transport.APIError
+		if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
+			return "", err
 		}
 	}
 	sent, err := msgs.Send(ctx, channelID, content)

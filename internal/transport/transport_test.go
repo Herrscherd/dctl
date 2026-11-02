@@ -51,7 +51,7 @@ func TestHTTPDoDisabledWithoutToken(t *testing.T) {
 }
 
 func TestHTTPDoSurfacesAPIError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		writeBody(t, w, `{"message":"Missing Permissions"}`)
 	}))
@@ -101,7 +101,7 @@ func TestHTTPDoMarshalsBody(t *testing.T) {
 
 func TestHTTPDoWaitsOutARateLimit(t *testing.T) {
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		if calls == 1 {
 			w.WriteHeader(http.StatusTooManyRequests)
@@ -151,7 +151,7 @@ func TestARetriedWriteCarriesItsBodyAgain(t *testing.T) {
 
 func TestALongRateLimitIsReportedRatherThanWaitedOut(t *testing.T) {
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		w.WriteHeader(http.StatusTooManyRequests)
 		writeBody(t, w, `{"retry_after":3600}`)
@@ -170,7 +170,7 @@ func TestALongRateLimitIsReportedRatherThanWaitedOut(t *testing.T) {
 
 func TestARateLimitThatNeverClearsGivesUp(t *testing.T) {
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		w.WriteHeader(http.StatusTooManyRequests)
 		writeBody(t, w, `{"retry_after":0.001}`)
@@ -187,7 +187,7 @@ func TestARateLimitThatNeverClearsGivesUp(t *testing.T) {
 
 func TestAWaitingRequestStopsWithItsContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		cancel()
 		w.WriteHeader(http.StatusTooManyRequests)
 		writeBody(t, w, `{"retry_after":20}`)

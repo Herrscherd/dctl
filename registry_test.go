@@ -46,7 +46,7 @@ func TestRegistrySyncReconciles(t *testing.T) {
 func TestRegistryDispatch(t *testing.T) {
 	reg := newReg(transport.NewStub())
 	called := false
-	reg.Add(NewCommand("ping", "p"), func(ctx context.Context, ix Interaction) (Response, error) {
+	reg.Add(NewCommand("ping", "p"), func(_ context.Context, _ Interaction) (Response, error) {
 		called = true
 		return Response{Content: "pong"}, nil
 	})
@@ -75,7 +75,7 @@ func TestRegistryRemoveAndOrder(t *testing.T) {
 
 func TestDispatchRejectsAutocomplete(t *testing.T) {
 	reg := newReg(transport.NewStub())
-	reg.Add(NewCommand("ping", "p"), func(ctx context.Context, ix Interaction) (Response, error) {
+	reg.Add(NewCommand("ping", "p"), func(_ context.Context, _ Interaction) (Response, error) {
 		t.Fatal("command handler must not run for an autocomplete interaction")
 		return Response{}, nil
 	})
@@ -88,7 +88,7 @@ func TestDispatchRejectsAutocomplete(t *testing.T) {
 func TestDispatchAutocomplete(t *testing.T) {
 	reg := newReg(transport.NewStub())
 	reg.Add(NewCommand("pick", "p"), nil).
-		Autocomplete("pick", func(ctx context.Context, ix Interaction) ([]AutocompleteChoice, error) {
+		Autocomplete("pick", func(_ context.Context, _ Interaction) ([]AutocompleteChoice, error) {
 			return []AutocompleteChoice{{Name: "a", Value: "a"}}, nil
 		})
 	ix := Interaction{Type: InteractionAutocomplete, Data: InteractionData{Name: "pick"}}

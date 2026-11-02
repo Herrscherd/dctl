@@ -82,6 +82,9 @@ const rateLimitRetries = 4
 
 const maxRateLimitWait = 30 * time.Second
 
+// Do sends one request to the REST API and decodes the JSON reply into out. It
+// returns [ErrDisabled] when no token is set, a [*APIError] for a non-2xx status,
+// and the context error when ctx ends while a rate limit is waited out.
 func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error {
 	if !h.Enabled() {
 		return ErrDisabled

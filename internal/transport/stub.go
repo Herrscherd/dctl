@@ -52,7 +52,9 @@ func (s *Stub) Last() Call {
 // Calls returns every captured call in order.
 func (s *Stub) Calls() []Call { return s.calls }
 
-func (s *Stub) Do(ctx context.Context, method, path string, body, out any) error {
+// Do records the call. It returns the next queued error, then the error set by
+// [Stub.Fail], and otherwise fills out from the queued replies.
+func (s *Stub) Do(_ context.Context, method, path string, body, out any) error {
 	s.calls = append(s.calls, Call{Method: method, Path: path, Body: body})
 	if len(s.nextErrs) > 0 {
 		err := s.nextErrs[0]

@@ -53,6 +53,7 @@ func (r *Roles) Update(ctx context.Context, guildID, roleID string, fields map[s
 	return &role, nil
 }
 
+// Delete removes a role from a server. The server is resolved as in [Members.Get].
 func (r *Roles) Delete(ctx context.Context, guildID, roleID string) error {
 	gid, err := r.def.resolveGuild(ctx, guildID)
 	if err != nil {

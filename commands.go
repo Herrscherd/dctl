@@ -76,7 +76,7 @@ func (c *Command) Name() string { return c.name }
 // Loc adds a localized name and description for one locale.
 func (c *Command) Loc(l Locale, name, description string) *Command {
 	if c.nameLoc == nil {
-		c.nameLoc, c.descLoc = map[string]string{}, map[string]string{}
+		c.nameLoc, c.descLoc = make(map[string]string), make(map[string]string)
 	}
 	c.nameLoc[string(l)] = name
 	c.descLoc[string(l)] = description
@@ -158,24 +158,51 @@ func leaf(typ int, name, desc string, required bool) Option {
 	return Option{typ: typ, name: name, desc: desc, required: required}
 }
 
-func String(name, desc string, required bool) Option { return leaf(optString, name, desc, required) }
+// String returns a string option. Name is its key and desc its description
+// shown to users; required makes Discord refuse the command without it.
+func String(name, desc string, required bool) Option {
+	return leaf(optString, name, desc, required)
+}
 
-func Int(name, desc string, required bool) Option { return leaf(optInteger, name, desc, required) }
+// Int returns an integer option, whole numbers only.
+func Int(name, desc string, required bool) Option {
+	return leaf(optInteger, name, desc, required)
+}
 
-func Bool(name, desc string, required bool) Option { return leaf(optBoolean, name, desc, required) }
-func User(name, desc string, required bool) Option { return leaf(optUser, name, desc, required) }
+// Bool returns a boolean option.
+func Bool(name, desc string, required bool) Option {
+	return leaf(optBoolean, name, desc, required)
+}
+
+// User returns an option that takes a user.
+func User(name, desc string, required bool) Option {
+	return leaf(optUser, name, desc, required)
+}
+
+// Mentionable returns an option that takes a user, a role or both.
 func Mentionable(name, desc string, required bool) Option {
 	return leaf(optMentionable, name, desc, required)
 }
 
-func Number(name, desc string, required bool) Option { return leaf(optNumber, name, desc, required) }
+// Number returns a number option, fractions allowed.
+func Number(name, desc string, required bool) Option {
+	return leaf(optNumber, name, desc, required)
+}
 
-// ChannelOpt, RoleOpt and AttachmentOpt carry the -Opt suffix to avoid clashing
-// with the Channel, Role and Attachment DTO types.
+// ChannelOpt returns an option that takes a channel. The -Opt suffix avoids a
+// clash with the Channel DTO type.
 func ChannelOpt(name, desc string, required bool) Option {
 	return leaf(optChannel, name, desc, required)
 }
-func RoleOpt(name, desc string, required bool) Option { return leaf(optRole, name, desc, required) }
+
+// RoleOpt returns an option that takes a role. The -Opt suffix avoids a clash
+// with the Role DTO type.
+func RoleOpt(name, desc string, required bool) Option {
+	return leaf(optRole, name, desc, required)
+}
+
+// AttachmentOpt returns an option that takes an uploaded file. The -Opt suffix
+// avoids a clash with the Attachment DTO type.
 func AttachmentOpt(name, desc string, required bool) Option {
 	return leaf(optAttachment, name, desc, required)
 }

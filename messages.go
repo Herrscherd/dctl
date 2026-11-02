@@ -84,6 +84,8 @@ func (m *Messages) Get(ctx context.Context, channelID, messageID string) (*Messa
 	return &msg, nil
 }
 
+// Edit replaces the content of a message. An empty channelID falls back to the
+// default channel and returns [ErrNoChannel] when none is set.
 func (m *Messages) Edit(ctx context.Context, channelID, messageID, content string) (*Message, error) {
 	ch, err := m.def.resolveChannel(channelID)
 	if err != nil {
@@ -97,6 +99,8 @@ func (m *Messages) Edit(ctx context.Context, channelID, messageID, content strin
 	return &msg, nil
 }
 
+// Delete removes a message. An empty channelID falls back to the default channel
+// and returns [ErrNoChannel] when none is set.
 func (m *Messages) Delete(ctx context.Context, channelID, messageID string) error {
 	ch, err := m.def.resolveChannel(channelID)
 	if err != nil {
