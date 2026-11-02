@@ -60,8 +60,8 @@ func WithBase(base string) Option { return func(h *HTTP) { h.base = base } }
 // WithHTTPClient overrides the default 15s-timeout client.
 func WithHTTPClient(c *http.Client) Option { return func(h *HTTP) { h.client = c } }
 
-// WithLogger sets the logger that reports a successful response whose body
-// fails to close. The default discards it.
+// WithLogger sets the logger that reports a response body that fails to read or
+// close, unless the call already fails with that error. The default discards it.
 func WithLogger(logger *slog.Logger) Option { return func(h *HTTP) { h.logger = logger } }
 
 // NewHTTP builds the real transport. An empty token makes every Do return ErrDisabled.
@@ -190,8 +190,11 @@ func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, has
 	}
 	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	closeErr := resp.Body.Close()
-	if readErr != nil {
+	if readErr != nil && isSuccess(resp.StatusCode) {
 		return response{}, fmt.Errorf("reading response: %w", errors.Join(readErr, closeErr))
+	}
+	if readErr != nil {
+		h.logger.Warn("response body failed to read", "method", method, "status", resp.StatusCode, "error", readErr)
 	}
 	if closeErr != nil {
 		h.logger.Warn("response body failed to close", "method", method, "status", resp.StatusCode, "error", closeErr)

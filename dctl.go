@@ -31,8 +31,9 @@ func WithHTTPClient(h *http.Client) ClientOption {
 	return func(c *clientConfig) { c.httpClient = h }
 }
 
-// WithLogger sets the logger for the warning raised when a response body fails
-// to close after it was read. Without it that warning is discarded.
+// WithLogger sets the logger that reports a response body that fails to read or
+// close, unless the call already fails with that error. Without it those reports
+// are discarded.
 func WithLogger(logger *slog.Logger) ClientOption {
 	return func(c *clientConfig) { c.logger = logger }
 }

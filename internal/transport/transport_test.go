@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/iotest"
 )
 
 func TestHTTPDoSetsAuthAndDecodes(t *testing.T) {
@@ -274,6 +275,55 @@ func TestHTTPDoRetriesARateLimitWhenBodyFailsToClose(t *testing.T) {
 			return &http.Response{
 				StatusCode: http.StatusTooManyRequests,
 				Body:       closeFailingBody{Reader: strings.NewReader(`{"retry_after":0.01}`), err: closeErr},
+			}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})}
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"))
+	if err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil); err != nil {
+		t.Fatalf("err = %v, want the rate limit retried to success", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want the 429 replayed once", calls)
+	}
+}
+
+func TestHTTPDoReportsANotFoundWhenBodyFailsToRead(t *testing.T) {
+	readErr := errors.New("connection reset")
+	const partial = `{"message":"Unknown Message"`
+	var logs strings.Builder
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(io.MultiReader(strings.NewReader(partial), iotest.ErrReader(readErr))),
+		}, nil
+	})}
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"), WithLogger(logger))
+	err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil)
+	apiErr, ok := errors.AsType[*APIError](err)
+	if !ok || apiErr.Status != http.StatusNotFound {
+		t.Fatalf("err = %v, want *APIError with status 404", err)
+	}
+	if apiErr.Body != partial {
+		t.Errorf("body = %q, want the partial body kept", apiErr.Body)
+	}
+	if !strings.Contains(logs.String(), readErr.Error()) {
+		t.Errorf("logs = %q, want the read failure logged", logs.String())
+	}
+}
+
+func TestHTTPDoRetriesARateLimitWhenBodyFailsToRead(t *testing.T) {
+	calls := 0
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body: io.NopCloser(io.MultiReader(
+					strings.NewReader(`{"retry_after":0.01}`),
+					iotest.ErrReader(errors.New("connection reset")),
+				)),
 			}, nil
 		}
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
