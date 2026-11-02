@@ -162,8 +162,10 @@ func (d InteractionData) Focused() (name, value string, ok bool) {
 func findFocused(opts []InteractionOption) (string, string, bool) {
 	for _, o := range opts {
 		if o.Focused {
-			s, _ := o.Value.(string)
-			return o.Name, s, true
+			if text, isText := o.Value.(string); isText {
+				return o.Name, text, true
+			}
+			return o.Name, "", true
 		}
 		if n, v, ok := findFocused(o.Options); ok {
 			return n, v, ok
