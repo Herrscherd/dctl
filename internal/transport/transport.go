@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -47,6 +48,7 @@ type HTTP struct {
 	token  string
 	base   string
 	client *http.Client
+	logger *slog.Logger
 }
 
 // Option configures an HTTP transport.
@@ -58,9 +60,18 @@ func WithBase(base string) Option { return func(h *HTTP) { h.base = base } }
 // WithHTTPClient overrides the default 15s-timeout client.
 func WithHTTPClient(c *http.Client) Option { return func(h *HTTP) { h.client = c } }
 
+// WithLogger sets the logger that reports a successful response whose body
+// fails to close. The default discards it.
+func WithLogger(logger *slog.Logger) Option { return func(h *HTTP) { h.logger = logger } }
+
 // NewHTTP builds the real transport. An empty token makes every Do return ErrDisabled.
 func NewHTTP(token string, opts ...Option) *HTTP {
-	httpTransport := &HTTP{token: token, base: DefaultBase, client: &http.Client{Timeout: defaultTimeout}}
+	httpTransport := &HTTP{
+		token:  token,
+		base:   DefaultBase,
+		client: &http.Client{Timeout: defaultTimeout},
+		logger: slog.New(slog.DiscardHandler),
+	}
 	for _, o := range opts {
 		o(httpTransport)
 	}
@@ -133,7 +144,7 @@ func waitFor(ctx context.Context, wait time.Duration) error {
 }
 
 func decodeResponse(status int, respBody []byte, out any) error {
-	if status < 200 || status >= 300 {
+	if !isSuccess(status) {
 		return &APIError{Status: status, Body: strings.TrimSpace(string(respBody))}
 	}
 	if out == nil || len(respBody) == 0 {
@@ -141,6 +152,8 @@ func decodeResponse(status int, respBody []byte, out any) error {
 	}
 	return json.Unmarshal(respBody, out)
 }
+
+func isSuccess(status int) bool { return status >= 200 && status < 300 }
 
 func retryAfter(body []byte) (time.Duration, bool) {
 	var rateLimit struct {
@@ -177,6 +190,12 @@ func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, has
 	}
 	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	closeErr := resp.Body.Close()
+	if readErr == nil && isSuccess(resp.StatusCode) {
+		if closeErr != nil {
+			h.logger.Warn("response body failed to close after a successful call", "method", method, "status", resp.StatusCode, "error", closeErr)
+		}
+		return response{body: respBody, status: resp.StatusCode}, nil
+	}
 	if err := errors.Join(readErr, closeErr); err != nil {
 		return response{}, fmt.Errorf("reading response: %w", err)
 	}

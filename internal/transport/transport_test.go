@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -218,18 +219,43 @@ type closeFailingBody struct {
 
 func (b closeFailingBody) Close() error { return b.err }
 
-func TestHTTPDoJoinsBodyCloseError(t *testing.T) {
+func TestHTTPDoAcceptsASuccessWhoseBodyFailsToClose(t *testing.T) {
 	closeErr := errors.New("body close failed")
 	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
+			Body:       closeFailingBody{Reader: strings.NewReader(`{"id":"42"}`), err: closeErr},
+		}, nil
+	})}
+	var logs strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"), WithLogger(logger))
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := rt.Do(context.Background(), http.MethodPost, "/x", map[string]string{"content": "hi"}, &out); err != nil {
+		t.Fatalf("err = %v, want success: the accepted write must not look failed", err)
+	}
+	if out.ID != "42" {
+		t.Errorf("id = %q, want the decoded reply", out.ID)
+	}
+	if !strings.Contains(logs.String(), closeErr.Error()) {
+		t.Errorf("logs = %q, want the close failure logged", logs.String())
+	}
+}
+
+func TestHTTPDoJoinsBodyCloseErrorOnFailure(t *testing.T) {
+	closeErr := errors.New("body close failed")
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
 			Body:       closeFailingBody{Reader: strings.NewReader(`{}`), err: closeErr},
 		}, nil
 	})}
 	rt := NewHTTP("tok", WithHTTPClient(client), WithBase("http://discord.invalid"))
 	err := rt.Do(context.Background(), http.MethodGet, "/x", nil, nil)
 	if !errors.Is(err, closeErr) {
-		t.Fatalf("err = %v, want the body close error", err)
+		t.Fatalf("err = %v, want the body close error on a failed call", err)
 	}
 }
 
