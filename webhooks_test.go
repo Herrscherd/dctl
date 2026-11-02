@@ -60,7 +60,7 @@ func TestWebhooksExecute(t *testing.T) {
 	if c.Method != "POST" || c.Path != "/webhooks/w1/tok" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
-	if c.Body.(map[string]any)["content"] != "hello" {
+	if asType[map[string]any](t, c.Body)["content"] != "hello" {
 		t.Errorf("body = %v", c.Body)
 	}
 }

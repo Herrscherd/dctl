@@ -18,7 +18,7 @@ func TestPermissionsSetOverwrite(t *testing.T) {
 	if c.Method != "PUT" || c.Path != "/channels/c1/permissions/r1" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
-	body := c.Body.(map[string]any)
+	body := asType[map[string]any](t, c.Body)
 	if body["allow"] != "1024" || body["type"] != 0 || body["deny"] != "0" {
 		t.Errorf("body = %v", body)
 	}

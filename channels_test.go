@@ -25,7 +25,7 @@ func TestChannelsCreate(t *testing.T) {
 	if c.Method != "POST" || c.Path != "/guilds/g1/channels" {
 		t.Errorf("call = %s %s", c.Method, c.Path)
 	}
-	if c.Body.(map[string]any)["name"] != "logs" {
+	if asType[map[string]any](t, c.Body)["name"] != "logs" {
 		t.Errorf("body = %v", c.Body)
 	}
 }
@@ -77,7 +77,7 @@ func TestChannelsEnsureUnderCreates(t *testing.T) {
 	if c.Method != "POST" || c.Path != "/guilds/g1/channels" {
 		t.Fatalf("create call = %s %s", c.Method, c.Path)
 	}
-	if c.Body.(map[string]any)["parent_id"] != "p1" {
+	if asType[map[string]any](t, c.Body)["parent_id"] != "p1" {
 		t.Errorf("body = %v", c.Body)
 	}
 	if n := len(s.Calls()); n != 3 {

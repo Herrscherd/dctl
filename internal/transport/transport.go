@@ -142,9 +142,9 @@ func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, has
 	if err != nil {
 		return nil, 0, scrubURLError(method, err)
 	}
-	defer resp.Body.Close()
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
+	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	closeErr := resp.Body.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
 		return nil, 0, fmt.Errorf("reading response: %w", err)
 	}
 	return respBody, resp.StatusCode, nil

@@ -24,7 +24,7 @@ func TestMessagesSendUsesDefaultChannelAndNoAllowedMentions(t *testing.T) {
 	if c.Path != "/channels/def/messages" {
 		t.Errorf("path = %s", c.Path)
 	}
-	if _, present := c.Body.(map[string]any)["allowed_mentions"]; present {
+	if _, present := asType[map[string]any](t, c.Body)["allowed_mentions"]; present {
 		t.Error("noMentions removed: allowed_mentions must NOT be injected")
 	}
 }
