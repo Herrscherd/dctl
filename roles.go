@@ -54,8 +54,6 @@ func (r *Roles) Update(ctx context.Context, guildID, roleID string, fields map[s
 }
 
 // Delete removes a role from a server. The server is resolved as in [Members.Get].
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (r *Roles) Delete(ctx context.Context, guildID, roleID string) error {
 	gid, err := r.def.resolveGuild(ctx, guildID)
 	if err != nil {
@@ -65,8 +63,6 @@ func (r *Roles) Delete(ctx context.Context, guildID, roleID string) error {
 }
 
 // Assign grants roleID to member userID.
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (r *Roles) Assign(ctx context.Context, guildID, userID, roleID string) error {
 	gid, err := r.def.resolveGuild(ctx, guildID)
 	if err != nil {
@@ -76,8 +72,6 @@ func (r *Roles) Assign(ctx context.Context, guildID, userID, roleID string) erro
 }
 
 // Unassign removes roleID from member userID.
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (r *Roles) Unassign(ctx context.Context, guildID, userID, roleID string) error {
 	gid, err := r.def.resolveGuild(ctx, guildID)
 	if err != nil {

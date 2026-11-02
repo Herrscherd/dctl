@@ -243,8 +243,6 @@ func (in *Interactions) commandsBase(ctx context.Context) (string, error) {
 }
 
 // RegisterCommands bulk-overwrites the command scope from raw maps.
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (in *Interactions) RegisterCommands(ctx context.Context, commands []map[string]any) error {
 	base, err := in.commandsBase(ctx)
 	if err != nil {
@@ -254,8 +252,6 @@ func (in *Interactions) RegisterCommands(ctx context.Context, commands []map[str
 }
 
 // Register bulk-overwrites the command scope from builders.
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (in *Interactions) Register(ctx context.Context, cmds ...*Command) error {
 	body := make([]map[string]any, 0, len(cmds))
 	for _, c := range cmds {
@@ -291,8 +287,6 @@ func (in *Interactions) Create(ctx context.Context, cmd *Command) (RegisteredCom
 }
 
 // Edit updates the command with the given id.
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (in *Interactions) Edit(ctx context.Context, commandID string, cmd *Command) error {
 	base, err := in.commandsBase(ctx)
 	if err != nil {
@@ -302,8 +296,6 @@ func (in *Interactions) Edit(ctx context.Context, commandID string, cmd *Command
 }
 
 // Delete removes the command with the given id.
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen. It fails when Discord rejects the request.
 func (in *Interactions) Delete(ctx context.Context, commandID string) error {
 	base, err := in.commandsBase(ctx)
 	if err != nil {
@@ -323,8 +315,6 @@ func (in *Interactions) Registry() *Registry {
 }
 
 // Respond sends a CHANNEL_MESSAGE_WITH_SOURCE (type 4) reply.
-//
-// It fails when Discord rejects the request.
 func (in *Interactions) Respond(ctx context.Context, interactionID, token string, response Response) error {
 	data := map[string]any{fieldContent: response.Content}
 	if response.Ephemeral {
@@ -336,8 +326,6 @@ func (in *Interactions) Respond(ctx context.Context, interactionID, token string
 
 // Defer acknowledges an interaction with a DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
 // (type 5). The ephemeral flag must match the eventual reply's visibility.
-//
-// It fails when Discord rejects the request.
 func (in *Interactions) Defer(ctx context.Context, interactionID, token string, ephemeral bool) error {
 	data := make(map[string]any)
 	if ephemeral {
@@ -350,8 +338,6 @@ func (in *Interactions) Defer(ctx context.Context, interactionID, token string, 
 // RespondAutocomplete sends an APPLICATION_COMMAND_AUTOCOMPLETE_RESULT (type 8)
 // reply carrying the suggestion list. Discord accepts at most 25 choices; extras
 // are dropped here so callers need not pre-trim.
-//
-// It fails when Discord rejects the request.
 func (in *Interactions) RespondAutocomplete(ctx context.Context, interactionID, token string, choices []AutocompleteChoice) error {
 	if len(choices) > maxAutocompleteChoices {
 		choices = choices[:maxAutocompleteChoices]
@@ -367,8 +353,6 @@ func (in *Interactions) RespondAutocomplete(ctx context.Context, interactionID, 
 // EditResponse fills in the deferred reply by editing the original interaction
 // response via the webhook endpoint. appID is the bot's application id (see
 // AppID); the interaction token authorizes the edit for ~15 minutes.
-//
-// It fails when Discord rejects the request.
 func (in *Interactions) EditResponse(ctx context.Context, appID, token string, response Response) error {
 	return in.rt.Do(ctx, http.MethodPatch, "/webhooks/"+seg(appID)+"/"+seg(token)+"/messages/@original",
 		map[string]any{fieldContent: response.Content}, nil)

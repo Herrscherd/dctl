@@ -25,8 +25,6 @@ type Channels struct {
 }
 
 // List returns the channels of a guild (or the sole guild when guildID is empty).
-//
-// It returns [ErrNoGuild] or an [*AmbiguousGuildError] when no server can be chosen.
 func (c *Channels) List(ctx context.Context, guildID string) ([]Channel, error) {
 	gid, err := c.def.resolveGuild(ctx, guildID)
 	if err != nil {
