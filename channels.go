@@ -69,10 +69,6 @@ func (c *Channels) CreateUnder(ctx context.Context, parentID, name string) (*Cha
 	return c.create(ctx, gid, map[string]any{"name": name, "type": ChannelText, "parent_id": parentID})
 }
 
-// guildOf reads the guild a channel belongs to. The parent category already
-// says which server the caller means, so asking Discord beats falling back to
-// the sole guild — which is wrong for a bot in several servers and an error for
-// a bot in none.
 func (c *Channels) guildOf(ctx context.Context, channelID string) (string, error) {
 	if channelID == "" {
 		return "", nil
@@ -148,8 +144,6 @@ func (c *Channels) EnsureUnder(ctx context.Context, parentID, name string) (*Cha
 			return &chs[i], nil
 		}
 	}
-	// The guild is already known here; create directly rather than let
-	// CreateUnder look the parent up a second time.
 	return c.create(ctx, gid, map[string]any{"name": name, "type": ChannelText, "parent_id": parentID})
 }
 

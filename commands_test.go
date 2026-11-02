@@ -56,7 +56,7 @@ func TestCommandFullCoverage(t *testing.T) {
 	if got["name_localizations"].(map[string]string)["fr"] != "config" {
 		t.Errorf("cmd name loc missing: %#v", got["name_localizations"])
 	}
-	if got["default_member_permissions"] != "268435488" { // (1<<5)|(1<<28)
+	if got["default_member_permissions"] != "268435488" {
 		t.Errorf("perms = %v", got["default_member_permissions"])
 	}
 	if got["dm_permission"] != false || got["nsfw"] != true {
@@ -92,8 +92,6 @@ func TestContextMenuCommandHasNoDescription(t *testing.T) {
 }
 
 func TestContextMenuCommandOmitsDescriptionLocalizations(t *testing.T) {
-	// Loc on a context-menu command may localize the name but must NOT emit
-	// description_localizations (Discord rejects it for type 2/3).
 	got := NewUserCommand("Report").Loc(LocaleFR, "Signaler", "ignored").JSON()
 	if _, ok := got["description_localizations"]; ok {
 		t.Errorf("context-menu command must omit description_localizations: %#v", got)

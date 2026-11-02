@@ -71,7 +71,7 @@ func (m *Messages) Read(ctx context.Context, channelID string, limit int, after 
 
 // Get returns one message by id from channelID (or the default channel). Read
 // only reaches the tail of a channel, so this is the way to a message named by
-// something other than recency — the one a reply points at, for instance.
+// something other than recency: the one a reply points at, for instance.
 func (m *Messages) Get(ctx context.Context, channelID, messageID string) (*Message, error) {
 	ch, err := m.def.resolveChannel(channelID)
 	if err != nil {

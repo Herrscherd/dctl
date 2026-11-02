@@ -33,8 +33,6 @@ func TestThreadsStart(t *testing.T) {
 	}
 }
 
-// A private thread is created off the CHANNEL, never off a message: a message
-// would be the public trace the thread exists to avoid.
 func TestThreadsStartPrivate(t *testing.T) {
 	s := transport.NewStub().Reply(`{"id":"t9","name":"job","type":12}`)
 	ch, err := thr(s).StartPrivate(context.Background(), "c1", "job")
@@ -52,7 +50,6 @@ func TestThreadsStartPrivate(t *testing.T) {
 	if body["type"] != ChannelPrivateThread {
 		t.Errorf("type = %v, want a private thread", body["type"])
 	}
-	// invitable would let any member drag others in, which defeats the point.
 	if body["invitable"] != false {
 		t.Errorf("invitable = %v, want false", body["invitable"])
 	}

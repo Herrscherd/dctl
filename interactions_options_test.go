@@ -3,7 +3,6 @@ package dctl
 import "testing"
 
 func TestOptIntAndFloat(t *testing.T) {
-	// Discord delivers numbers as JSON floats.
 	d := InteractionData{Name: "cfg", Options: []InteractionOption{
 		{Name: "count", Type: optInteger, Value: float64(5)},
 		{Name: "ratio", Type: optNumber, Value: float64(1.5)},

@@ -26,7 +26,7 @@ func (t *Threads) Start(ctx context.Context, channelID, messageID, name string) 
 
 // StartPrivate opens a private thread in channelID, with no parent message so
 // the channel shows no trace of it. Only invited members and moderators holding
-// MANAGE_THREADS can see it — invitable is false, so members cannot pull others
+// MANAGE_THREADS can see it. Invitable is false, so members cannot pull others
 // in. The creating bot is a member; add the humans with AddMember.
 func (t *Threads) StartPrivate(ctx context.Context, channelID, name string) (*Channel, error) {
 	var ch Channel
