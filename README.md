@@ -64,6 +64,15 @@ reaches every server the bot is in and takes up to an hour to propagate.
 from `user` in a DM. Read either field alone and permission checks see an empty
 id in the other context.
 
+`Interaction.Locale` (the invoking user's language) and `Interaction.GuildLocale`
+(the guild's preferred language, empty in a DM) are Discord's raw locale strings,
+passed through unparsed. `Locale` is absent on PING interactions.
+
+`Command.Loc` and `Option.Loc` publish `name_localizations` and
+`description_localizations` (the description only on slash commands, which have
+one), and `Choice.Loc` publishes the choice's `name_localizations`. Only the
+entries you set are sent, and an empty map is omitted.
+
 ## Escaping and secrets
 
 Path segments are percent-escaped, and queries are built with `url.Values`.
