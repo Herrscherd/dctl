@@ -64,9 +64,9 @@ reaches every server the bot is in and takes up to an hour to propagate.
 from `user` in a DM. Read either field alone and permission checks see an empty
 id in the other context.
 
-`Interaction.Locale` (the invoking user's language) and `Interaction.GuildLocale`
-(the guild's preferred language, empty in a DM) are Discord's raw locale strings,
-passed through unparsed. `Locale` is absent on PING interactions.
+`Interaction.Locale` is the invoking user's language, as a `Locale` value. dctl
+passes Discord's value through unvalidated, so an unknown code is kept as is.
+Discord sends it on every interaction except PING.
 
 `Command.Loc` and `Option.Loc` publish `name_localizations` and
 `description_localizations` (the description only on slash commands, which have

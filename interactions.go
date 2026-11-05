@@ -19,16 +19,15 @@ const (
 // Interaction is the subset of a Discord INTERACTION_CREATE we handle
 // (application slash commands, type 2; autocomplete requests, type 4).
 type Interaction struct {
-	ID          string          `json:"id"`
-	Type        int             `json:"type"`
-	Token       Secret          `json:"token"`
-	GuildID     string          `json:"guild_id"`
-	ChannelID   string          `json:"channel_id"`
-	Locale      string          `json:"locale"`
-	GuildLocale string          `json:"guild_locale"`
-	Member      Member          `json:"member"`
-	User        Author          `json:"user"`
-	Data        InteractionData `json:"data"`
+	ID        string          `json:"id"`
+	Type      int             `json:"type"`
+	Token     Secret          `json:"token"`
+	GuildID   string          `json:"guild_id"`
+	ChannelID string          `json:"channel_id"`
+	Locale    Locale          `json:"locale"`
+	Member    Member          `json:"member"`
+	User      Author          `json:"user"`
+	Data      InteractionData `json:"data"`
 }
 
 // Member carries the invoking user (interactions in a guild come via member.user).

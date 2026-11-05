@@ -13,7 +13,6 @@ func TestInteractionDecodesLocales(t *testing.T) {
 		"token": "interaction-token",
 		"version": 1,
 		"guild_id": "1100000000000000003",
-		"guild_locale": "en-US",
 		"channel_id": "1100000000000000004",
 		"locale": "fr",
 		"member": {
@@ -30,10 +29,7 @@ func TestInteractionDecodesLocales(t *testing.T) {
 	if err := json.Unmarshal([]byte(payload), &in); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if in.Locale != "fr" {
-		t.Errorf("Locale = %q, want %q", in.Locale, "fr")
-	}
-	if in.GuildLocale != "en-US" {
-		t.Errorf("GuildLocale = %q, want %q", in.GuildLocale, "en-US")
+	if in.Locale != LocaleFR {
+		t.Errorf("Locale = %q, want %q", in.Locale, LocaleFR)
 	}
 }

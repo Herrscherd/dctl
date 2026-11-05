@@ -82,7 +82,7 @@ func TestClampRuneSafe(t *testing.T) {
 
 func TestComponentInteractionUnmarshal(t *testing.T) {
 	raw := `{
-		"id": "111", "type": 3, "token": "tok", "channel_id": "999",
+		"id": "111", "type": 3, "token": "tok", "channel_id": "999", "locale": "de",
 		"member": {"user": {"id": "42", "username": "neo"}},
 		"data": {"custom_id": "dctlchoice:s", "component_type": 3, "values": ["2"]}
 	}`
@@ -95,6 +95,9 @@ func TestComponentInteractionUnmarshal(t *testing.T) {
 	}
 	if in.ChannelID != "999" {
 		t.Fatalf("channel_id = %q, want 999", in.ChannelID)
+	}
+	if in.Locale != LocaleDE {
+		t.Fatalf("locale = %q, want %q", in.Locale, LocaleDE)
 	}
 	if in.Data.CustomID != "dctlchoice:s" {
 		t.Fatalf("custom_id = %q, want dctlchoice:s", in.Data.CustomID)
