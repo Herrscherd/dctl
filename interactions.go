@@ -24,6 +24,7 @@ type Interaction struct {
 	Token     Secret          `json:"token"`
 	GuildID   string          `json:"guild_id"`
 	ChannelID string          `json:"channel_id"`
+	Locale    Locale          `json:"locale"`
 	Member    Member          `json:"member"`
 	User      Author          `json:"user"`
 	Data      InteractionData `json:"data"`
