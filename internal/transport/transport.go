@@ -162,6 +162,9 @@ func encodeBody(body any) (encoded, error) {
 	case Multipart:
 		return encodeMultipart(typed)
 	case *Multipart:
+		if typed == nil {
+			return encoded{}, nil
+		}
 		return encodeMultipart(*typed)
 	default:
 		data, err := json.Marshal(typed)
@@ -212,7 +215,7 @@ func writePart(writer *multipart.Writer, part Part) error {
 }
 
 func quoteParam(value string) string {
-	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value)
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\r", "%0D", "\n", "%0A").Replace(value)
 }
 
 func waitFor(ctx context.Context, wait time.Duration) error {

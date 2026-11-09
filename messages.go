@@ -3,12 +3,14 @@ package dctl
 import (
 	"context"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/Herrscherd/dctl/internal/transport"
 )
@@ -25,7 +27,8 @@ func (m *Messages) Send(ctx context.Context, channelID, content string) (*Messag
 }
 
 // SendFiles posts content with files attached to channelID (or the default
-// channel). It returns [ErrTooManyFiles] when more than ten files are given.
+// channel). It returns [ErrTooManyFiles] when more than ten files are given and
+// [ErrInvalidFile] when a file is refused, before any request is sent.
 func (m *Messages) SendFiles(ctx context.Context, channelID, content string, files []File) (*Message, error) {
 	return m.postFiles(ctx, channelID, map[string]any{fieldContent: content}, files)
 }
@@ -37,7 +40,8 @@ func (m *Messages) Reply(ctx context.Context, channelID, messageID, content stri
 
 // ReplyFiles posts content with files attached as a reply to messageID in
 // channelID (or the default channel). It returns [ErrTooManyFiles] when more
-// than ten files are given.
+// than ten files are given and [ErrInvalidFile] when a file is refused, before
+// any request is sent.
 func (m *Messages) ReplyFiles(ctx context.Context, channelID, messageID, content string, files []File) (*Message, error) {
 	return m.postFiles(ctx, channelID, replyBody(messageID, content), files)
 }
@@ -79,8 +83,16 @@ func checkFile(file File) error {
 		return fmt.Errorf("%w: %q has no content", ErrInvalidFile, file.Name)
 	case file.Name == "":
 		return fmt.Errorf("%w: no name", ErrInvalidFile)
+	case !utf8.ValidString(file.Name):
+		return fmt.Errorf("%w: name %q is not valid UTF-8", ErrInvalidFile, file.Name)
 	case strings.ContainsFunc(file.Name, unicode.IsControl):
 		return fmt.Errorf("%w: name %q holds a control character", ErrInvalidFile, file.Name)
+	}
+	if file.ContentType == "" {
+		return nil
+	}
+	if _, _, err := mime.ParseMediaType(file.ContentType); err != nil {
+		return fmt.Errorf("%w: content type of %q: %w", ErrInvalidFile, file.Name, err)
 	}
 	return nil
 }

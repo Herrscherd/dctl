@@ -365,3 +365,23 @@ func TestEncodeBodyEncodesAMultipartByValueOrPointer(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeBodyTreatsANilMultipartPointerAsNoBody(t *testing.T) {
+	got, err := encodeBody((*Multipart)(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.data != nil || got.contentType != "" {
+		t.Errorf("encoded = %+v, want no body", got)
+	}
+}
+
+func TestWritePartEscapesLineBreaksInTheFilename(t *testing.T) {
+	got, err := encodeBody(Multipart{Files: []Part{{Name: "files[0]", Filename: "a\r\nX: y.png", Content: strings.NewReader("x")}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `filename="a%0D%0AX: y.png"`; !strings.Contains(string(got.data), want) {
+		t.Errorf("body lacks %q:\n%s", want, got.data)
+	}
+}

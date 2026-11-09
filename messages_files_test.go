@@ -230,6 +230,9 @@ func TestMessagesFilesRefusesAnInvalidFileBeforeAnyRequest(t *testing.T) {
 		{name: "no name", file: File{Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
 		{name: "newline in name", file: File{Name: "a\r\nX-Evil: 1.png", Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
 		{name: "nul in name", file: File{Name: "a\x00.png", Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
+		{name: "invalid utf-8 in name", file: File{Name: "a\xff.png", Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
+		{name: "crlf in content type", file: File{Name: "a.txt", ContentType: "text/plain\r\nX-Injected: yes", Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
+		{name: "unparsable content type", file: File{Name: "a.txt", ContentType: "text/", Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
 		{name: "failing reader", file: File{Name: "a.txt", Content: failingReader{}}, wantErr: io.ErrUnexpectedEOF},
 	}
 	for _, tt := range tests {
