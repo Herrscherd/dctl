@@ -38,7 +38,8 @@ type Attachment struct {
 // File is a file sent with a message. Name is the filename Discord shows,
 // Content the bytes (read once, when the message is sent), ContentType the media
 // type of Content, and Description the optional alt text Discord keeps with it.
-// A nil ContentType is sent as application/octet-stream.
+// An empty ContentType is sent as application/octet-stream. The whole message is
+// held in memory before it is sent, so that a retry sends the same bytes.
 type File struct {
 	Name        string
 	Content     io.Reader

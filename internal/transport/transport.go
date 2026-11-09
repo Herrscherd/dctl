@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -40,7 +39,7 @@ type APIError struct {
 func (e *APIError) Error() string { return fmt.Sprintf("discord %d: %s", e.Status, e.Body) }
 
 // Part is one file of a [Multipart] body. Name is the form field, Filename the
-// name the file carries, and Content its bytes. A nil ContentType is sent as
+// name the file carries, and Content its bytes. An empty ContentType is sent as
 // application/octet-stream.
 type Part struct {
 	Name        string
@@ -162,6 +161,8 @@ func encodeBody(body any) (encoded, error) {
 		return encoded{}, nil
 	case Multipart:
 		return encodeMultipart(typed)
+	case *Multipart:
+		return encodeMultipart(*typed)
 	default:
 		data, err := json.Marshal(typed)
 		return encoded{data: data, contentType: "application/json"}, err
@@ -190,16 +191,16 @@ func encodeMultipart(multi Multipart) (encoded, error) {
 }
 
 func writePart(writer *multipart.Writer, part Part) error {
-	params := map[string]string{"name": part.Name}
+	disposition := `form-data; name="` + quoteParam(part.Name) + `"`
 	if part.Filename != "" {
-		params["filename"] = part.Filename
+		disposition += `; filename="` + quoteParam(part.Filename) + `"`
 	}
 	contentType := part.ContentType
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 	header := textproto.MIMEHeader{
-		"Content-Disposition": {mime.FormatMediaType("form-data", params)},
+		"Content-Disposition": {disposition},
 		"Content-Type":        {contentType},
 	}
 	section, err := writer.CreatePart(header)
@@ -208,6 +209,10 @@ func writePart(writer *multipart.Writer, part Part) error {
 	}
 	_, err = io.Copy(section, part.Content)
 	return err
+}
+
+func quoteParam(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value)
 }
 
 func waitFor(ctx context.Context, wait time.Duration) error {

@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/Herrscherd/dctl/internal/transport"
 )
@@ -51,6 +53,11 @@ func (m *Messages) postFiles(ctx context.Context, channelID string, body map[str
 	if len(files) > maxAttachments {
 		return nil, ErrTooManyFiles
 	}
+	for index, file := range files {
+		if err := checkFile(file); err != nil {
+			return nil, fmt.Errorf("file %d: %w", index, err)
+		}
+	}
 	refs := make([]attachmentRef, len(files))
 	parts := make([]transport.Part, len(files))
 	for index, file := range files {
@@ -64,6 +71,18 @@ func (m *Messages) postFiles(ctx context.Context, channelID string, body map[str
 	}
 	body[fieldAttachments] = refs
 	return m.post(ctx, channelID, transport.Multipart{Payload: body, Files: parts})
+}
+
+func checkFile(file File) error {
+	switch {
+	case file.Content == nil:
+		return fmt.Errorf("%w: %q has no content", ErrInvalidFile, file.Name)
+	case file.Name == "":
+		return fmt.Errorf("%w: no name", ErrInvalidFile)
+	case strings.ContainsFunc(file.Name, unicode.IsControl):
+		return fmt.Errorf("%w: name %q holds a control character", ErrInvalidFile, file.Name)
+	}
+	return nil
 }
 
 type attachmentRef struct {

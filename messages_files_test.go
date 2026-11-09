@@ -1,10 +1,10 @@
 package dctl
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -82,8 +82,13 @@ func replyJSON(tb testing.TB, w http.ResponseWriter, status int, body string) {
 
 func requireSame(tb testing.TB, what string, got, want any) {
 	tb.Helper()
-	if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
-		tb.Errorf("%s = %v, want %v", what, got, want)
+	gotJSON, gotErr := json.Marshal(got)
+	wantJSON, wantErr := json.Marshal(want)
+	if gotErr != nil || wantErr != nil {
+		tb.Fatalf("%s: marshal got %v, want %v", what, gotErr, wantErr)
+	}
+	if !bytes.Equal(gotJSON, wantJSON) {
+		tb.Errorf("%s = %s, want %s", what, gotJSON, wantJSON)
 	}
 }
 
@@ -209,4 +214,76 @@ func TestMessagesFilesRetriesARateLimitWithTheSameBytes(t *testing.T) {
 	if body := sent[1].Files["files[0]"].Body; body != "hello" {
 		t.Errorf("retried file body = %q, want %q", body, "hello")
 	}
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+func TestMessagesFilesRefusesAnInvalidFileBeforeAnyRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    File
+		wantErr error
+	}{
+		{name: "no content", file: File{Name: "a.txt"}, wantErr: ErrInvalidFile},
+		{name: "no name", file: File{Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
+		{name: "newline in name", file: File{Name: "a\r\nX-Evil: 1.png", Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
+		{name: "nul in name", file: File{Name: "a\x00.png", Content: strings.NewReader("x")}, wantErr: ErrInvalidFile},
+		{name: "failing reader", file: File{Name: "a.txt", Content: failingReader{}}, wantErr: io.ErrUnexpectedEOF},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requests := 0
+			m := filesMessages(t, func(w http.ResponseWriter, _ *http.Request) {
+				requests++
+				replyJSON(t, w, http.StatusOK, `{"id":"m1"}`)
+			})
+			_, err := m.SendFiles(context.Background(), "", "x", []File{tt.file})
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+			if requests != 0 {
+				t.Errorf("requests = %d, want 0", requests)
+			}
+		})
+	}
+}
+
+func TestMessagesFilesKeepsTheFilenameAsItIs(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+	}{
+		{name: "accented", filename: "été.png"},
+		{name: "quote and backslash", filename: `a"b\c.png`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got sentRequest
+			m := filesMessages(t, func(w http.ResponseWriter, r *http.Request) {
+				got = captureRequest(t, r)
+				replyJSON(t, w, http.StatusOK, `{"id":"m1"}`)
+			})
+			if _, err := m.SendFiles(context.Background(), "", "", []File{{Name: tt.filename, Content: strings.NewReader("x")}}); err != nil {
+				t.Fatal(err)
+			}
+			if name := got.Files["files[0]"].Filename; name != tt.filename {
+				t.Errorf("part filename = %q, want %q", name, tt.filename)
+			}
+		})
+	}
+}
+
+func TestMessagesFilesWithNoFileSendsAnEmptyAttachmentList(t *testing.T) {
+	var got sentRequest
+	m := filesMessages(t, func(w http.ResponseWriter, r *http.Request) {
+		got = captureRequest(t, r)
+		replyJSON(t, w, http.StatusOK, `{"id":"m1"}`)
+	})
+	if _, err := m.SendFiles(context.Background(), "", "hi", nil); err != nil {
+		t.Fatal(err)
+	}
+	requireSame(t, "payload_json", got.Payload, map[string]any{"content": "hi", "attachments": []any{}})
+	requireSame(t, "file parts", got.Files, make(map[string]sentFile))
 }

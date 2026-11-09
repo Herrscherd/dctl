@@ -58,8 +58,11 @@ msg, err := c.Messages().SendFiles(ctx, "", "chart", []dctl.File{{
 ```
 
 A message takes at most ten files. More returns `ErrTooManyFiles` without a
-request. Each reader is read once, before the first attempt, so a rate limited
-upload is replayed with the same bytes.
+request. A file with no content, or whose name is empty or holds a control
+character, returns `ErrInvalidFile` without a request. Each reader is read once,
+before the first attempt, and the whole message is held in memory, so a rate
+limited upload is replayed with the same bytes. The filename is sent as it is,
+quoted, in the `filename` parameter of the part.
 
 ## Configuration
 
