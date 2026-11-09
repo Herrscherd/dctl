@@ -22,15 +22,57 @@ func (m *Messages) Send(ctx context.Context, channelID, content string) (*Messag
 	return m.post(ctx, channelID, map[string]any{fieldContent: content})
 }
 
-// Reply posts content as a reply to messageID in channelID (or the default channel).
-func (m *Messages) Reply(ctx context.Context, channelID, messageID, content string) (*Message, error) {
-	return m.post(ctx, channelID, map[string]any{
-		fieldContent:        content,
-		"message_reference": map[string]any{"message_id": messageID, "fail_if_not_exists": false},
-	})
+// SendFiles posts content with files attached to channelID (or the default
+// channel). It returns [ErrTooManyFiles] when more than ten files are given.
+func (m *Messages) SendFiles(ctx context.Context, channelID, content string, files []File) (*Message, error) {
+	return m.postFiles(ctx, channelID, map[string]any{fieldContent: content}, files)
 }
 
-func (m *Messages) post(ctx context.Context, channelID string, body map[string]any) (*Message, error) {
+// Reply posts content as a reply to messageID in channelID (or the default channel).
+func (m *Messages) Reply(ctx context.Context, channelID, messageID, content string) (*Message, error) {
+	return m.post(ctx, channelID, replyBody(messageID, content))
+}
+
+// ReplyFiles posts content with files attached as a reply to messageID in
+// channelID (or the default channel). It returns [ErrTooManyFiles] when more
+// than ten files are given.
+func (m *Messages) ReplyFiles(ctx context.Context, channelID, messageID, content string, files []File) (*Message, error) {
+	return m.postFiles(ctx, channelID, replyBody(messageID, content), files)
+}
+
+func replyBody(messageID, content string) map[string]any {
+	return map[string]any{
+		fieldContent:        content,
+		"message_reference": map[string]any{"message_id": messageID, "fail_if_not_exists": false},
+	}
+}
+
+func (m *Messages) postFiles(ctx context.Context, channelID string, body map[string]any, files []File) (*Message, error) {
+	if len(files) > maxAttachments {
+		return nil, ErrTooManyFiles
+	}
+	refs := make([]attachmentRef, len(files))
+	parts := make([]transport.Part, len(files))
+	for index, file := range files {
+		refs[index] = attachmentRef{ID: index, Filename: file.Name, Description: file.Description}
+		parts[index] = transport.Part{
+			Name:        "files[" + strconv.Itoa(index) + "]",
+			Filename:    file.Name,
+			ContentType: file.ContentType,
+			Content:     file.Content,
+		}
+	}
+	body[fieldAttachments] = refs
+	return m.post(ctx, channelID, transport.Multipart{Payload: body, Files: parts})
+}
+
+type attachmentRef struct {
+	ID          int    `json:"id"`
+	Filename    string `json:"filename"`
+	Description string `json:"description,omitempty"`
+}
+
+func (m *Messages) post(ctx context.Context, channelID string, body any) (*Message, error) {
 	channel, err := m.def.resolveChannel(channelID)
 	if err != nil {
 		return nil, err

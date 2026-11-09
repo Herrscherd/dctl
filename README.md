@@ -21,7 +21,7 @@ msgs, _ := c.Messages().Read(ctx, "", 20, "")           // oldest-first
 
 | Accessor | Operations |
 |---|---|
-| `Messages()` | `Send` `Reply` `Read` `Get` `Edit` `Delete` `LastMessageAt` |
+| `Messages()` | `Send` `SendFiles` `Reply` `ReplyFiles` `Read` `Get` `Edit` `Delete` `LastMessageAt` |
 | `Channels()` | `List` `Get` `Type` `Create` `CreateUnder` `Rename` `Update` `Delete` `Ensure` `EnsureUnder` `Archive` |
 | `Guilds()` | `List` `Sole` |
 | `Members()` | `List` `Get` `Kick` `Ban` |
@@ -40,6 +40,26 @@ A channel-scoped operation accepts `""` for the configured default channel.
 A guild-scoped one accepts `""` for the bot's sole guild, or for the guild pinned
 by `WithGuild`, which a bot in several servers needs. `CreateUnder` and
 `EnsureUnder` need neither: they read the guild off the parent category.
+
+## Attachments
+
+`SendFiles` and `ReplyFiles` take a `[]File`, each with the filename Discord
+shows, an `io.Reader` for its bytes, a content type and an optional description
+(the alt text). The message goes out as `multipart/form-data`: a `payload_json`
+part holding the message, then one `files[n]` part per file.
+
+```go
+msg, err := c.Messages().SendFiles(ctx, "", "chart", []dctl.File{{
+	Name:        "chart.png",
+	Content:     bytes.NewReader(png),
+	ContentType: "image/png",
+	Description: "weekly load",
+}})
+```
+
+A message takes at most ten files. More returns `ErrTooManyFiles` without a
+request. Each reader is read once, before the first attempt, so a rate limited
+upload is replayed with the same bytes.
 
 ## Configuration
 

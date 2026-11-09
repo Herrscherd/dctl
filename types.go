@@ -1,5 +1,7 @@
 package dctl
 
+import "io"
+
 // Secret is a token-like string that redacts itself in logs (%v, %+v, %#v) and
 // JSON so it can't leak by accident. Call Reveal to get the value when you must
 // send it (e.g. Webhooks.Execute).
@@ -31,6 +33,17 @@ type Attachment struct {
 	URL         string `json:"url"`
 	ContentType string `json:"content_type"`
 	Size        int    `json:"size"`
+}
+
+// File is a file sent with a message. Name is the filename Discord shows,
+// Content the bytes (read once, when the message is sent), ContentType the media
+// type of Content, and Description the optional alt text Discord keeps with it.
+// A nil ContentType is sent as application/octet-stream.
+type File struct {
+	Name        string
+	Content     io.Reader
+	ContentType string
+	Description string
 }
 
 // EmbedMedia is an image carried by an embed. URL is where the picture actually

@@ -8,6 +8,11 @@ import (
 // ErrNoGuild is returned by [Guilds.Sole] when the bot is in no server.
 var ErrNoGuild = errors.New("dctl: bot is in no server (invite it first)")
 
+// ErrTooManyFiles is returned by [Messages.SendFiles] and [Messages.ReplyFiles]
+// when more than ten files are given: Discord takes at most ten attachments on
+// one message.
+var ErrTooManyFiles = errors.New("dctl: a message takes at most 10 files")
+
 // AmbiguousGuildError is returned by [Guilds.Sole] when the bot is in more
 // than one server, so no single one can be chosen. Count is the number of
 // servers the bot is in.
