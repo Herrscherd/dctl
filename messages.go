@@ -91,6 +91,9 @@ func checkFile(file File) error {
 	if file.ContentType == "" {
 		return nil
 	}
+	if strings.ContainsFunc(file.ContentType, unicode.IsControl) {
+		return fmt.Errorf("%w: content type of %q holds a control character", ErrInvalidFile, file.Name)
+	}
 	if _, _, err := mime.ParseMediaType(file.ContentType); err != nil {
 		return fmt.Errorf("%w: content type of %q: %w", ErrInvalidFile, file.Name, err)
 	}
