@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"time"
@@ -36,8 +38,29 @@ type APIError struct {
 
 func (e *APIError) Error() string { return fmt.Sprintf("discord %d: %s", e.Status, e.Body) }
 
+// Part is one file of a [Multipart] body. Name is the form field, Filename the
+// name the file carries, and Content its bytes. An empty ContentType is sent as
+// application/octet-stream.
+type Part struct {
+	Name        string
+	Filename    string
+	ContentType string
+	Content     io.Reader
+}
+
+// Multipart is a request body of multipart/form-data, the encoding Discord uses
+// to attach files to a message. Payload is marshalled to JSON as the
+// payload_json part, and each entry of Files follows as its own part. Do reads
+// every Content once, before the first attempt, and replays the encoded body on
+// a rate limit retry.
+type Multipart struct {
+	Payload any
+	Files   []Part
+}
+
 // Doer performs one Discord REST call: it marshals body (if non-nil), executes
 // method+path against the API, and decodes the JSON response into out (if non-nil).
+// A [Multipart] body is sent as multipart/form-data instead of JSON.
 type Doer interface {
 	Do(ctx context.Context, method, path string, body, out any) error
 	Enabled() bool
@@ -100,12 +123,12 @@ func (h *HTTP) Do(ctx context.Context, method, path string, body, out any) error
 	if !h.Enabled() {
 		return ErrDisabled
 	}
-	buf, err := marshalBody(body)
+	enc, err := encodeBody(body)
 	if err != nil {
 		return err
 	}
 	for attempt := 0; ; attempt++ {
-		resp, err := h.attempt(ctx, method, path, buf, body != nil)
+		resp, err := h.attempt(ctx, method, path, enc)
 		if err != nil {
 			return err
 		}
@@ -127,11 +150,72 @@ func retryDelay(status, attempt int, respBody []byte) (time.Duration, bool) {
 	return wait, ok && wait <= maxRateLimitWait
 }
 
-func marshalBody(body any) ([]byte, error) {
-	if body == nil {
-		return nil, nil
+type encoded struct {
+	data        []byte
+	contentType string
+}
+
+func encodeBody(body any) (encoded, error) {
+	switch typed := body.(type) {
+	case nil:
+		return encoded{}, nil
+	case Multipart:
+		return encodeMultipart(typed)
+	case *Multipart:
+		if typed == nil {
+			return encoded{}, nil
+		}
+		return encodeMultipart(*typed)
+	default:
+		data, err := json.Marshal(typed)
+		return encoded{data: data, contentType: "application/json"}, err
 	}
-	return json.Marshal(body)
+}
+
+func encodeMultipart(multi Multipart) (encoded, error) {
+	payload, err := json.Marshal(multi.Payload)
+	if err != nil {
+		return encoded{}, err
+	}
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	if err := writePart(writer, Part{Name: "payload_json", ContentType: "application/json", Content: bytes.NewReader(payload)}); err != nil {
+		return encoded{}, err
+	}
+	for _, file := range multi.Files {
+		if err := writePart(writer, file); err != nil {
+			return encoded{}, fmt.Errorf("dctl: attachment %q: %w", file.Filename, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return encoded{}, err
+	}
+	return encoded{data: buf.Bytes(), contentType: writer.FormDataContentType()}, nil
+}
+
+func writePart(writer *multipart.Writer, part Part) error {
+	disposition := `form-data; name="` + quoteParam(part.Name) + `"`
+	if part.Filename != "" {
+		disposition += `; filename="` + quoteParam(part.Filename) + `"`
+	}
+	contentType := part.ContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	header := textproto.MIMEHeader{
+		"Content-Disposition": {disposition},
+		"Content-Type":        {contentType},
+	}
+	section, err := writer.CreatePart(header)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(section, part.Content)
+	return err
+}
+
+func quoteParam(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\r", "%0D", "\n", "%0A").Replace(value)
 }
 
 func waitFor(ctx context.Context, wait time.Duration) error {
@@ -170,10 +254,10 @@ type response struct {
 	status int
 }
 
-func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, hasBody bool) (response, error) {
+func (h *HTTP) attempt(ctx context.Context, method, path string, enc encoded) (response, error) {
 	var rdr io.Reader
-	if hasBody {
-		rdr = bytes.NewReader(buf)
+	if enc.contentType != "" {
+		rdr = bytes.NewReader(enc.data)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, h.base+path, rdr)
 	if err != nil {
@@ -181,8 +265,8 @@ func (h *HTTP) attempt(ctx context.Context, method, path string, buf []byte, has
 	}
 	req.Header.Set("Authorization", "Bot "+h.token)
 	req.Header.Set("User-Agent", "dctl (https://github.com/Herrscherd/dctl, 1.0)")
-	if hasBody {
-		req.Header.Set("Content-Type", "application/json")
+	if enc.contentType != "" {
+		req.Header.Set("Content-Type", enc.contentType)
 	}
 	resp, err := h.client.Do(req)
 	if err != nil {

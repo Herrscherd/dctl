@@ -343,3 +343,45 @@ func writeBody(tb testing.TB, w io.Writer, body string) {
 		tb.Errorf("writing response: %v", err)
 	}
 }
+
+func TestEncodeBodyEncodesAMultipartByValueOrPointer(t *testing.T) {
+	multi := Multipart{
+		Payload: map[string]any{"content": "hi"},
+		Files:   []Part{{Name: "files[0]", Filename: `a"b.png`, Content: strings.NewReader("PNG")}},
+	}
+	for name, body := range map[string]any{"value": multi, "pointer": &multi} {
+		t.Run(name, func(t *testing.T) {
+			multi.Files[0].Content = strings.NewReader("PNG")
+			got, err := encodeBody(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(got.contentType, "multipart/form-data; boundary=") {
+				t.Fatalf("content type = %q, want multipart/form-data", got.contentType)
+			}
+			if want := `Content-Disposition: form-data; name="files[0]"; filename="a\"b.png"`; !strings.Contains(string(got.data), want) {
+				t.Errorf("body lacks %q:\n%s", want, got.data)
+			}
+		})
+	}
+}
+
+func TestEncodeBodyTreatsANilMultipartPointerAsNoBody(t *testing.T) {
+	got, err := encodeBody((*Multipart)(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.data != nil || got.contentType != "" {
+		t.Errorf("encoded = %+v, want no body", got)
+	}
+}
+
+func TestWritePartEscapesLineBreaksInTheFilename(t *testing.T) {
+	got, err := encodeBody(Multipart{Files: []Part{{Name: "files[0]", Filename: "a\r\nX: y.png", Content: strings.NewReader("x")}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `filename="a%0D%0AX: y.png"`; !strings.Contains(string(got.data), want) {
+		t.Errorf("body lacks %q:\n%s", want, got.data)
+	}
+}

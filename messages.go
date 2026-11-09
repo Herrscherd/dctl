@@ -3,10 +3,14 @@ package dctl
 import (
 	"context"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/Herrscherd/dctl/internal/transport"
 )
@@ -22,15 +26,87 @@ func (m *Messages) Send(ctx context.Context, channelID, content string) (*Messag
 	return m.post(ctx, channelID, map[string]any{fieldContent: content})
 }
 
-// Reply posts content as a reply to messageID in channelID (or the default channel).
-func (m *Messages) Reply(ctx context.Context, channelID, messageID, content string) (*Message, error) {
-	return m.post(ctx, channelID, map[string]any{
-		fieldContent:        content,
-		"message_reference": map[string]any{"message_id": messageID, "fail_if_not_exists": false},
-	})
+// SendFiles posts content with files attached to channelID (or the default
+// channel). It returns [ErrTooManyFiles] when more than ten files are given and
+// [ErrInvalidFile] when a file is refused, before any request is sent.
+func (m *Messages) SendFiles(ctx context.Context, channelID, content string, files []File) (*Message, error) {
+	return m.postFiles(ctx, channelID, map[string]any{fieldContent: content}, files)
 }
 
-func (m *Messages) post(ctx context.Context, channelID string, body map[string]any) (*Message, error) {
+// Reply posts content as a reply to messageID in channelID (or the default channel).
+func (m *Messages) Reply(ctx context.Context, channelID, messageID, content string) (*Message, error) {
+	return m.post(ctx, channelID, replyBody(messageID, content))
+}
+
+// ReplyFiles posts content with files attached as a reply to messageID in
+// channelID (or the default channel). It returns [ErrTooManyFiles] when more
+// than ten files are given and [ErrInvalidFile] when a file is refused, before
+// any request is sent.
+func (m *Messages) ReplyFiles(ctx context.Context, channelID, messageID, content string, files []File) (*Message, error) {
+	return m.postFiles(ctx, channelID, replyBody(messageID, content), files)
+}
+
+func replyBody(messageID, content string) map[string]any {
+	return map[string]any{
+		fieldContent:        content,
+		"message_reference": map[string]any{"message_id": messageID, "fail_if_not_exists": false},
+	}
+}
+
+func (m *Messages) postFiles(ctx context.Context, channelID string, body map[string]any, files []File) (*Message, error) {
+	if len(files) > maxAttachments {
+		return nil, ErrTooManyFiles
+	}
+	for index, file := range files {
+		if err := checkFile(file); err != nil {
+			return nil, fmt.Errorf("file %d: %w", index, err)
+		}
+	}
+	refs := make([]attachmentRef, len(files))
+	parts := make([]transport.Part, len(files))
+	for index, file := range files {
+		refs[index] = attachmentRef{ID: index, Filename: file.Name, Description: file.Description}
+		parts[index] = transport.Part{
+			Name:        "files[" + strconv.Itoa(index) + "]",
+			Filename:    file.Name,
+			ContentType: file.ContentType,
+			Content:     file.Content,
+		}
+	}
+	body[fieldAttachments] = refs
+	return m.post(ctx, channelID, transport.Multipart{Payload: body, Files: parts})
+}
+
+func checkFile(file File) error {
+	switch {
+	case file.Content == nil:
+		return fmt.Errorf("%w: %q has no content", ErrInvalidFile, file.Name)
+	case file.Name == "":
+		return fmt.Errorf("%w: no name", ErrInvalidFile)
+	case !utf8.ValidString(file.Name):
+		return fmt.Errorf("%w: name %q is not valid UTF-8", ErrInvalidFile, file.Name)
+	case strings.ContainsFunc(file.Name, unicode.IsControl):
+		return fmt.Errorf("%w: name %q holds a control character", ErrInvalidFile, file.Name)
+	}
+	if file.ContentType == "" {
+		return nil
+	}
+	if strings.ContainsFunc(file.ContentType, unicode.IsControl) {
+		return fmt.Errorf("%w: content type of %q holds a control character", ErrInvalidFile, file.Name)
+	}
+	if _, _, err := mime.ParseMediaType(file.ContentType); err != nil {
+		return fmt.Errorf("%w: content type of %q: %w", ErrInvalidFile, file.Name, err)
+	}
+	return nil
+}
+
+type attachmentRef struct {
+	ID          int    `json:"id"`
+	Filename    string `json:"filename"`
+	Description string `json:"description,omitempty"`
+}
+
+func (m *Messages) post(ctx context.Context, channelID string, body any) (*Message, error) {
 	channel, err := m.def.resolveChannel(channelID)
 	if err != nil {
 		return nil, err
